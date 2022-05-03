@@ -80,7 +80,7 @@ class SlideView(QGraphicsObject):
             self.set_image()
 
     def wheelEvent(self, event: 'QGraphicsSceneWheelEvent') -> None:
-        self.scene()
+        pass
 
     def wheel_position_changed(self, image_pos_upleft: QPoint, image_pos_lowright: QPoint, width: int, height: int):
         """
