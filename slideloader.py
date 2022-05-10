@@ -81,7 +81,7 @@ class SlideLoader(QObject):
             factor "1.5" as current buffer for higher levels
             factor "1" currently now buffer for lower levels used
             """
-            resize_fac = 2 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
+            resize_fac = 2.5 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
             level_dimensions = np.asarray([self.view_width, self.view_height])
             for n in range(self.num_lvl, 0, -1):
                 self.slide_size.append((level_dimensions * resize_fac * 1 ** n).astype(int))
@@ -110,7 +110,7 @@ class SlideLoader(QObject):
             check if an update is necessary
             """
             diff = np.abs(self.old_center - center_low_lvl)
-            reserve = self.slide_size[0]/2
+            reserve = np.asarray([self.view_width, self.view_height])/2
 
             if self.new_file or diff[0] > reserve[0] or diff[1] > reserve[1]:  # check if new position will fit into current slides
                 """
@@ -140,5 +140,6 @@ class SlideLoader(QObject):
 
                 self.zoom_stack = new_stack
                 self.old_center = center_low_lvl
+                print("new stack")
             self.new_file = False
         self.start_updating.emit()  # use a signal for constant updating

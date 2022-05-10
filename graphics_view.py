@@ -23,10 +23,6 @@ class GraphicsView(QGraphicsView):
             super(GraphicsView, self).fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def resizeEvent(self, event: QResizeEvent):
-        """
-        currently just fits the view after resizing
-        ToDo: fix the problem with large window sizes. If started with a small window size and change into a large one, the images are to small to fit
-        """
         if self.scene():
             self.fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
             self.children()[3].resize_view()
