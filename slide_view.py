@@ -19,7 +19,6 @@ class SlideView(QGraphicsObject):
         self.slide_lvl: int = None
         self.scene_pos: np.ndarray = None
         self.mouse_pos: np.ndarray = None
-        self.scale_factor: int = 0
         self.refactor_image()
         self.set_image()
         self.update_check()
@@ -28,6 +27,7 @@ class SlideView(QGraphicsObject):
         width = self.scene().views()[0].viewport().width()
         height = self.scene().views()[0].viewport().height()
         self.slideloader.update_slide(width=width, height=height)
+        self.refactor_image()
 
     def boundingRect(self):
         return self.childrenBoundingRect()
@@ -51,16 +51,11 @@ class SlideView(QGraphicsObject):
         self.slide_lvl = self.slideloader.slide_lvl
         self.scene_pos = self.slideloader.scene_pos
         self.mouse_pos = self.slideloader.mouse_pos
-        self.scale_factor = 1
 
     def set_image(self):
         """
         load the position and data
         """
-
-        # stack = self.slideloader.get_zoom_stack(self.slide_lvl)
-        # self.scene_pos = stack['position']
-        # image = np.array(stack['data'])
         self.scene_pos = self.slideloader.zoom_stack[self.slide_lvl]['position']
         image = np.array(self.slideloader.zoom_stack[self.slide_lvl]['data'])
 
@@ -82,10 +77,13 @@ class SlideView(QGraphicsObject):
 
     def slide_change(self, slide_change: int):
         self.slide_lvl += slide_change
+        print(self.slide_lvl)
         if self.slide_lvl < 0:
             self.slide_lvl = 0 # no image_update if on lowest slide
+            pass
         if self.slide_lvl > self.slideloader.num_lvl:
             self.slide_lvl = self.slideloader.num_lvl # no image_update if on highest slide
+            pass
         self.set_image()
 
     @pyqtSlot()
