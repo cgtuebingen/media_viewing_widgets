@@ -58,9 +58,9 @@ class SlideView(QGraphicsObject):
         load the position and data
         """
 
-        #stack = self.slideloader.get_zoom_stack(self.slide_lvl)
-        #self.scene_pos = stack['position']
-        #image = np.array(stack['data'])
+        # stack = self.slideloader.get_zoom_stack(self.slide_lvl)
+        # self.scene_pos = stack['position']
+        # image = np.array(stack['data'])
         self.scene_pos = self.slideloader.zoom_stack[self.slide_lvl]['position']
         image = np.array(self.slideloader.zoom_stack[self.slide_lvl]['data'])
 
@@ -83,28 +83,28 @@ class SlideView(QGraphicsObject):
     def slide_change(self, slide_change: int):
         self.slide_lvl += slide_change
         if self.slide_lvl < 0:
-            self.slide_lvl = 0
-            pass  # no image_update if on lowest slide
+            self.slide_lvl = 0 # no image_update if on lowest slide
         if self.slide_lvl > self.slideloader.num_lvl:
-            self.slide_lvl = self.slideloader.num_lvl
-            pass  # no image_update if on highest slide
+            self.slide_lvl = self.slideloader.num_lvl # no image_update if on highest slide
         self.set_image()
 
     @pyqtSlot()
     def update_check(self):
         if self.scene():
-            """
             width = self.scene().views()[0].viewport().width()
             height = self.scene().views()[0].viewport().height()
-            center_view = self.scene().views()[0].mapToScene(int(width / 2), int(height / 2))
-            center_slide = (self.slideloader.zoom_stack[self.slide_lvl]['position'] +
-                            self.slideloader.slide_size[self.slide_lvl] * 2 ** self.slide_lvl / 2)
-            difference = np.abs(np.asarray([center_view.x(), center_view.y()]) - center_slide)
-            buffer = np.abs((self.slideloader.slide_size[self.slide_lvl]) - np.asarray([width, height])) * (2 ** self.slide_lvl)
 
-            if difference[0] > buffer[0] or difference[0] > buffer[0]:
+            scene_up_left = self.scene_pos
+            scene_low_right = self.scene_pos + self.slideloader.slide_size[self.slide_lvl] * 2 ** self.slide_lvl
+
+            view_up_left = self.scene().views()[0].mapToScene(int(0.02*width), int(0.02*height))
+            view_low_right = self.scene().views()[0].mapToScene(int(0.98*width), int(0.98*height))
+
+            if scene_up_left[0] > view_up_left.x() or scene_up_left[1] > view_up_left.y() or \
+                    scene_low_right[0] < view_low_right.x() or scene_low_right[1] < view_low_right.y() and \
+                    self.slide_lvl != self.num_lvl:
                 self.set_image()
-            """
+
         self.start_checking.emit()
 
     def wheelEvent(self, event: 'QGraphicsSceneWheelEvent'):
@@ -127,22 +127,6 @@ class SlideView(QGraphicsObject):
                 self.slide_change(int(-1))
             if distance / 2 > height:  # the resolution difference between two slides is "2"
                 self.slide_change(int(+1))
-
-    def mouseReleaseEvent(self, event: 'QGraphicsSceneMouseEvent') -> None:
-        """
-        width = self.scene().views()[0].viewport().width()
-        height = self.scene().views()[0].viewport().height()
-        center_view = self.scene().views()[0].mapToScene(int(width / 2), int(height / 2))
-        center_slide = (self.slideloader.zoom_stack[self.slide_lvl]['position'] +
-                        self.slideloader.slide_size[self.slide_lvl] * 2 ** self.slide_lvl / 2) / (2 ** self.slide_lvl)
-        difference = np.abs(center_view - center_slide)
-        buffer = np.abs((self.slideloader.slide_size[self.slide_lvl] / (2 ** self.slide_lvl)) -
-                        np.asarray([width, height]))
-
-        if difference[0] > buffer[0] or difference[0] > buffer[0]:
-            self.slideloader.set_zoom_stack()
-        """
-        self.set_image()
 
     def hoverMoveEvent(self, event: 'QGraphicsSceneHoverEvent') -> None:
         mouse_scene_pos = self.mapToScene(event.pos())

@@ -22,8 +22,8 @@ if __name__ == '__main__':
     app = QApplication(['test'])
 
     viewer = GraphicsView()
-    viewer.show()
     viewer.resize(660, 600)
+    viewer.fitInView()
 
     scene = BaseGraphicsScene()
 
@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
     scene.addItem(slide_view)
     viewer.setScene(scene)
-    viewer.fitInView()
+
+    viewer.show()
 
     app.exec()

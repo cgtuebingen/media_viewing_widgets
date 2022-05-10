@@ -46,6 +46,7 @@ class SlideLoader(QObject):
         not included in constructor in case a new file os loaded
         """
         self.slide = OpenSlide(filepath)
+        self.slide.level_dimensions[0]
 
     def update_slide(self, width: int, height: int):
         """
@@ -55,8 +56,6 @@ class SlideLoader(QObject):
         self.slide_size = []
         self.view_width = width
         self.view_height = height
-        print(self.view_height)
-        print(self.view_width)
         if np.asarray(self.slide.level_dimensions[-1])[0] >= np.asarray(self.slide.level_dimensions[-1])[1]:
             self.dominate_x = True
         else:
@@ -76,11 +75,11 @@ class SlideLoader(QObject):
 
         """
         calculate the needed size for the slides
-        factor "2" as panning buffer
+        factor "3" as panning buffer
         factor "1.5" as current buffer for higher levels
         factor "1" currently now buffer for lower levels used
         """
-        resize_fac = 2 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
+        resize_fac = 3 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
         level_dimensions = np.asarray([self.view_width, self.view_height])
         for n in range(self.num_lvl, 0, -1):
             self.slide_size.append((level_dimensions * resize_fac * 1 ** n).astype(int))
@@ -88,7 +87,6 @@ class SlideLoader(QObject):
         """
         just assignments
         """
-        print(self.slide_size)
         self.slide_lvl = self.num_lvl
         self.scene_pos = np.array([0, 0])
         self.mouse_pos = (np.asarray(self.slide.level_dimensions[0]) / 2).astype(int)
