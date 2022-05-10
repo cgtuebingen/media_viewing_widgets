@@ -98,9 +98,10 @@ class SlideView(QGraphicsObject):
             view_up_left = self.scene().views()[0].mapToScene(int(0.02*width), int(0.02*height))
             view_low_right = self.scene().views()[0].mapToScene(int(0.98*width), int(0.98*height))
 
-            if scene_up_left[0] > view_up_left.x() or scene_up_left[1] > view_up_left.y() or \
-                    scene_low_right[0] < view_low_right.x() or scene_low_right[1] < view_low_right.y() and \
-                    self.slide_lvl != self.num_lvl:
+            if self.slide_lvl != self.num_lvl and \
+                    (scene_up_left[0] > view_up_left.x() or scene_up_left[1] > view_up_left.y() or
+                     scene_low_right[0] < view_low_right.x() or scene_low_right[1] < view_low_right.y()):
+                print("update image")
                 self.set_image()
 
         self.start_checking.emit()
