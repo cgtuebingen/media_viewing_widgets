@@ -79,13 +79,10 @@ class SlideView(QGraphicsObject):
         self.slide_lvl += slide_change
         if self.slide_lvl < 0:
             self.slide_lvl = 0  # no image_update if on lowest slide
-            print(self.slide_lvl)
             pass
         if self.slide_lvl > self.slideloader.num_lvl:
             self.slide_lvl = self.slideloader.num_lvl  # no image_update if on highest slide
-            print(self.slide_lvl)
             pass
-        print(self.slide_lvl)
         self.set_image()
 
     @pyqtSlot()

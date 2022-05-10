@@ -140,6 +140,5 @@ class SlideLoader(QObject):
 
                 self.zoom_stack = new_stack
                 self.old_center = center_low_lvl
-                print("new stack")
             self.new_file = False
         self.start_updating.emit()  # use a signal for constant updating
