@@ -54,7 +54,7 @@ class GraphicsView(QGraphicsView):
         if self._panning:
             new_pos = self.mapToScene(event.pos())
             move = new_pos - self._pan_start
-            self.translate(move.x(), move.y())
+            self.translate(move.x()/2, move.y()/2)
             self._pan_start = self.mapToScene(event.pos())
         super(GraphicsView, self).mouseMoveEvent(event)
 
