@@ -81,10 +81,10 @@ class SlideLoader(QObject):
             factor "1.5" as current buffer for higher levels
             factor "1" currently now buffer for lower levels used
             """
-            resize_fac = 2.5 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
+            resize_fac = 2 * 1.5 * np.array(self.slide.level_dimensions)[self.num_lvl, 0] / size_slide
             level_dimensions = np.asarray([self.view_width, self.view_height])
             for n in range(self.num_lvl, 0, -1):
-                self.slide_size.append((level_dimensions * resize_fac * 1 ** n).astype(int))
+                self.slide_size.append((level_dimensions * resize_fac * 1.05 ** n).astype(int))
             self.slide_size.append(np.asarray(self.slide.level_dimensions[self.num_lvl]).astype(int))    # append the upper slide with no resize factor
             """
             just assignments

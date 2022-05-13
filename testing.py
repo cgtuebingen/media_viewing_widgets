@@ -22,7 +22,7 @@ if __name__ == '__main__':
     app = QApplication(['test'])
 
     viewer = GraphicsView()
-    viewer.resize(1500, 600)
+    viewer.resize(1800, 600)
     viewer.fitInView()
 
     scene = BaseGraphicsScene()
