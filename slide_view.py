@@ -105,7 +105,6 @@ class SlideView(QGraphicsObject):
                         view_up_left.y() > scene_up_left_goal[1] and
                         view_low_right.x() < scene_low_right_goal[0] and
                         view_low_right.y() < scene_low_right_goal[1]) and lvl < self.slide_lvl_active:
-                    # include self.slide_lvl_active != lvl
                     self.slide_lvl_active = lvl
                     self.set_image()
                     break_flag = True
@@ -114,7 +113,6 @@ class SlideView(QGraphicsObject):
                         view_up_left.y() < scene_up_left_goal[1] or
                         view_low_right.x() > scene_low_right_goal[0] or
                         view_low_right.y() > scene_low_right_goal[1]) and lvl > self.slide_lvl_active:
-                    # include self.slide_lvl_active != lvl
                     self.slide_lvl_active = lvl
                     self.set_image()
                     break_flag = True
