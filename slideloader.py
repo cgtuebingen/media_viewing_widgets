@@ -26,7 +26,6 @@ class SlideLoader(QObject):
         self.slide_size: List[np.ndarray] = []
         self._zoom_stack: Dict[int, ZoomDict] = None
         self.mouse_pos: np.ndarray = None
-        # self.scene_pos: np.ndarray = None
         self.old_center: np.ndarray = None
         self.new_file: bool = None
         self.view_width: int = None
@@ -65,7 +64,6 @@ class SlideLoader(QObject):
             self.slide_size.append((level_dimensions * resize_fac * 1 ** n).astype(int))
         self.slide_size.append(np.asarray(self.slide.level_dimensions[self.num_lvl]).astype(int)) # append the upper slide with no resize factor
 
-        # self.scene_pos = np.array([0, 0])
         self.mouse_pos = (np.asarray(self.slide.level_dimensions[0]) / 2).astype(int)
         self.old_center = self.mouse_pos
         self.new_file = True

@@ -69,7 +69,6 @@ class SlideView(QGraphicsObject):
         """stretch the image into normed size and set the scene position"""
         self.setScale(2 ** self.slide_lvl_active)
         self.setPos(*self.scene_pos)
-        # self.slideloader.scene_pos = self.scene_pos
 
     def slide_change(self, slide_change: int):
         self.slide_lvl_goal += slide_change
