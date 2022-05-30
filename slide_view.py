@@ -58,7 +58,6 @@ class SlideView(QGraphicsObject):
         slides = self.slideloader.get_zoom_stack()
         self.scene_pos = slides[self.slide_lvl_active]['position']
         image = slides[self.slide_lvl_active]['data']
-        print("Update")
 
         """set the image"""
         height, width, channel = image.shape
@@ -74,13 +73,10 @@ class SlideView(QGraphicsObject):
         self.slide_lvl_goal += slide_change
         if self.slide_lvl_goal < 0:
             self.slide_lvl_goal = 0  # no image_update if on lowest slide
-            print(f'goal:{self.slide_lvl_goal} current: {self.slide_lvl_active}')
-            pass
+            return
         if self.slide_lvl_goal > self.slideloader.num_lvl:
             self.slide_lvl_goal = self.slideloader.num_lvl  # no image_update if on highest slide
-
-            pass
-        print(f'goal:{self.slide_lvl_goal} current: {self.slide_lvl_active}')
+            return
 
     @pyqtSlot()
     def update_image_check(self):

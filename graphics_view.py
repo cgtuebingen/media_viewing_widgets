@@ -28,9 +28,7 @@ class GraphicsView(QGraphicsView):
             self.children()[3].resize_view()
 
     def wheelEvent(self, event: QWheelEvent):
-        """
-        scales the image and moves into the mouse position
-        """
+        """scales the image and moves into the mouse position"""
         oldPos = self.mapToScene(event.position().toPoint())
         scale_factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
         self.scale(scale_factor, scale_factor)
