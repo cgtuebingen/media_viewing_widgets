@@ -23,7 +23,7 @@ class SlideView(QGraphicsObject):
         self.backup_activ: bool = None
         self.refactor_image()
         self.set_image()
-        self.update_image_check()
+        #self.update_image_check()
 
     def resize_view(self):
         width = self.scene().views()[0].viewport().width()

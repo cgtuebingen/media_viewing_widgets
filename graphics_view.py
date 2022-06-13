@@ -1,3 +1,4 @@
+import numpy as np
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -17,10 +18,18 @@ class GraphicsView(QGraphicsView):
 
         self._pan_start: bool = False
         self._panning: bool = False
+        self.scale_track: float = 1.0
+        self.moved_x: float = 0.0
+        self.moved_y: float = 0.0
 
     def fitInView(self, *__args):
         if self.scene():
+            self.children()[3].refactor_image()
+            self.children()[3].set_image()
             super(GraphicsView, self).fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self.children()[3].setPos(-self.moved_x, -self.moved_y)
+            self.moved_x = 0.0
+            self.moved_y = 0.0
 
     def resizeEvent(self, event: QResizeEvent):
         if self.scene():
@@ -29,11 +38,18 @@ class GraphicsView(QGraphicsView):
 
     def wheelEvent(self, event: QWheelEvent):
         """scales the image and moves into the mouse position"""
-        oldPos = self.mapToScene(event.position().toPoint())
+        old_pos = self.mapToScene(event.position().toPoint())
         scale_factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
+        self.scale_track = self.scale_track * scale_factor
         self.scale(scale_factor, scale_factor)
-        newPos = self.mapToScene(event.position().toPoint())
-        move = newPos - oldPos
+        if self.scale_track < 1.0:
+            self.scale_track = 1.0
+            self.fitInView()
+            return
+        new_pos = self.mapToScene(event.position().toPoint())
+        move = new_pos - old_pos
+        self.moved_x += move.x()
+        self.moved_y += move.y()
         self.translate(move.x(), move.y())
         super(GraphicsView, self).wheelEvent(event)
 
@@ -61,3 +77,7 @@ class GraphicsView(QGraphicsView):
             filepath = QFileDialog().getOpenFileName()[0]
             self.scene().items()[1].load_new_image(filepath=filepath)
             self.fitInView()
+        if event.key() == Qt.Key_F:
+            self.fitInView()
+        if event.key() == Qt.Key_T:
+            self.translate(10**5, 0)
