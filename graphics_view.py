@@ -79,5 +79,3 @@ class GraphicsView(QGraphicsView):
             self.fitInView()
         if event.key() == Qt.Key_F:
             self.fitInView()
-        if event.key() == Qt.Key_T:
-            self.translate(10**5, 0)
