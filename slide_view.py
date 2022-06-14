@@ -23,7 +23,6 @@ class SlideView(QGraphicsObject):
         self.backup_activ: bool = None
         self.refactor_image()
         self.set_image()
-        #self.update_image_check()
 
     def resize_view(self):
         width = self.scene().views()[0].viewport().width()
@@ -63,11 +62,12 @@ class SlideView(QGraphicsObject):
         height, width, channel = image.shape
         bytesPerLine = 3 * width
         qimg = QImage(image.data, width, height, bytesPerLine, QImage.Format.Format_RGB888)
+        self.pixmap_item.resetTransform()
         self.pixmap_item.setPixmap(QPixmap(qimg))
 
         """stretch the image into normed size and set the scene position"""
-        self.setScale(2 ** self.slide_lvl_active)
-        self.setPos(*self.scene_pos)
+        self.pixmap_item.setScale(2 ** self.slide_lvl_active)
+        self.pixmap_item.setPos(*self.scene_pos)
 
     def slide_change(self, slide_change: int):
         self.slide_lvl_goal += slide_change
