@@ -25,7 +25,7 @@ class GraphicsView(QGraphicsView):
 
     def loadfile(self):
         """Loads a new file
-        :return: /
+        :return:
         """
         filepath = QFileDialog().getOpenFileName()[0]
         self.children()[3].load_new_image(filepath=filepath)
