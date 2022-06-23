@@ -7,6 +7,9 @@ from PyQt5.QtWidgets import *
 class GraphicsView(QGraphicsView):
 
     def __init__(self, *args):
+        """Initilization
+        :param args:
+        """
         super(GraphicsView, self).__init__(*args)
         self.setBackgroundBrush(QBrush(QColor("r")))
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
