@@ -11,7 +11,6 @@ class GraphicsView(QGraphicsView):
         Initialization of the GraphicsView
         :param args: /
         :type args: /
-
         """
         super(GraphicsView, self).__init__(*args)
 
@@ -43,7 +42,7 @@ class GraphicsView(QGraphicsView):
         :type __args: /
         :return: /
         """
-        if self.scene():
+        if self.scene():    # don't run code without a scene, prevents crashes
             super(GraphicsView, self).fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
             self.children()[3].refactor_image()
 
@@ -54,8 +53,8 @@ class GraphicsView(QGraphicsView):
         :type event: QResizeEvent
         :return: /
         """
-        if self.scene():
-            self.children()[3].slide_loader.stop_updating()
+        if self.scene():    # don't run code without a scene, prevents crashes
+            self.children()[3].slide_loader.stop_updating()     # deactivating the slide update to prevent crash
             self.fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event: QWheelEvent):
@@ -108,6 +107,9 @@ class GraphicsView(QGraphicsView):
             move = new_pos - self._pan_start
             self.translate(move.x(), move.y())
             self._pan_start = self.mapToScene(event.pos())
+        # reactivate slide update after resize of the window
+        # ToDO: possibly not the best way, but a mouse move while occur, therefore it's convenient to reactivate it here
+        # seems to slow down the program
         if not self.children()[3].slide_loader.status_update():
             self.children()[3].slide_loader.start_updating()
         super(GraphicsView, self).mouseMoveEvent(event)
