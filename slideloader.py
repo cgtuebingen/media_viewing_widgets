@@ -20,22 +20,19 @@ class SlideLoader(QObject):
         self.moveToThread(self._slide_loader_thread)
         self._slide_loader_thread.start()
 
-        self.slide_filepath: str = None
-        self.slide: OpenSlide = None
-        self.num_lvl: int = None
+        self.slide: OpenSlide = OpenSlide(filepath)
+        self.num_lvl: int = 0
         self.slide_size: List[np.ndarray] = []
-        self._zoom_stack: Dict[int, ZoomDict] = None
-        self.mouse_pos: np.ndarray = None
-        self.old_center: np.ndarray = None
-        self.new_file: bool = None
-        self.view_width: int = None
-        self.view_height: int = None
+        self._zoom_stack: Dict[int, ZoomDict] = {}
+        self.mouse_pos: np.ndarray = np.array([0, 0])
+        self.old_center: np.ndarray = np.array([0, 0])
+        self.new_file: bool = True
+        self.view_width: int = width
+        self.view_height: int = height
         self._stack_mutex = QMutex()
         self._updating_slides: bool = True
 
-
         self.update_slides.connect(self.updating_zoom_stack, Qt.ConnectionType.QueuedConnection)
-        self.set_slide(filepath)
         self.update_slide_size(width=width, height=height)
         self.updating_zoom_stack()
 
@@ -115,6 +112,10 @@ class SlideLoader(QObject):
             self.update_slides.emit()  # use a signal for constant updating
 
     def get_zoom_stack(self):
+        """
+        Returns the current stack of slides
+        :return: stack of slides
+        """
         with QMutexLocker(self._stack_mutex):
             return self._zoom_stack
 
@@ -134,6 +135,10 @@ class SlideLoader(QObject):
         self._updating_slides = False
 
     def status_update(self):
+        """
+        Returns if the update of slides is currently running
+        :return: Status updating_zoom_stack (True if active)
+        """
         return self._updating_slides
 
 
