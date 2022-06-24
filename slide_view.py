@@ -18,6 +18,7 @@ class SlideView(QGraphicsObject):
         :type width: int
         :param height: height of the GraphicView
         :type height: int
+
         """
         super(SlideView, self).__init__()
 

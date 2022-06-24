@@ -33,6 +33,7 @@ class SlideLoader(QObject):
         self._stack_mutex = QMutex()
         self._updating_slides: bool = True
 
+
         self.update_slides.connect(self.updating_zoom_stack, Qt.ConnectionType.QueuedConnection)
         self.set_slide(filepath)
         self.update_slide_size(width=width, height=height)

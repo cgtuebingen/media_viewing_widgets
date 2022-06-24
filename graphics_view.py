@@ -11,6 +11,7 @@ class GraphicsView(QGraphicsView):
         Initialization of the GraphicsView
         :param args: /
         :type args: /
+
         """
         super(GraphicsView, self).__init__(*args)
 
