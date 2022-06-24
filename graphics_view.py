@@ -7,11 +7,16 @@ from PyQt5.QtWidgets import *
 class GraphicsView(QGraphicsView):
 
     def __init__(self, *args):
-        """Initialization of the GraphicsView
+        """
+        Initialization of the GraphicsView
         :param args: /
         :type args: /
         """
         super(GraphicsView, self).__init__(*args)
+
+        self._pan_start: QPointF = []   # starting point before panning
+        self._panning: bool = False     # flag to enable panning
+
         self.setBackgroundBrush(QBrush(QColor("r")))
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
@@ -20,11 +25,9 @@ class GraphicsView(QGraphicsView):
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setMouseTracking(True)
 
-        self._pan_start = None
-        self._panning: bool = False
-
     def loadfile(self):
-        """Loads a new file
+        """
+        Loads a new file
         :return: /
         :return:
         """
@@ -33,28 +36,30 @@ class GraphicsView(QGraphicsView):
         self.fitInView()
 
     def fitInView(self, *__args):
-        """Resets the view to the original size and resets the slide level
+        """
+        Resets the view to the original size and resets the slide level
         :param __args: /
         :type __args: /
         :return: /
         """
         if self.scene():
-            self.children()[3].refactor_image()
-            self.children()[3].set_image()
             super(GraphicsView, self).fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self.children()[3].refactor_image()
 
     def resizeEvent(self, event: QResizeEvent):
-        """Calls fitInView after resizing the window
+        """
+        Calls fitInView after resizing the window
         :param event: event to initialize the function
         :type event: QResizeEvent
         :return: /
         """
         if self.scene():
+            self.children()[3].slide_loader.stop_updating()
             self.fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
-            self.children()[3].resize_view()
 
     def wheelEvent(self, event: QWheelEvent):
-        """Scales the image and moves into the mouse position
+        """
+        Scales the image and moves into the mouse position
         :param event: event to initialize the function
         :type event: QWheelEvent
         :return: /
@@ -68,7 +73,8 @@ class GraphicsView(QGraphicsView):
         super(GraphicsView, self).wheelEvent(event)
 
     def mousePressEvent(self, event: QMouseEvent):
-        """Enables panning of the image
+        """
+        Enables panning of the image
         :param event: event to initialize the function
         :type event: QMouseEvent
         :return: /
@@ -79,7 +85,8 @@ class GraphicsView(QGraphicsView):
         super(GraphicsView, self).mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        """Disables panning of the image
+        """
+        Disables panning of the image
         :param event: event to initialize the function
         :type event: QMouseEvent
         :return: /
@@ -89,7 +96,8 @@ class GraphicsView(QGraphicsView):
         super(GraphicsView, self).mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        """Realizes panning, if activated
+        """
+        Realizes panning, if activated
         :param event: event to initialize the function
         :type event: QMouseEvent
         :return: /
@@ -99,10 +107,13 @@ class GraphicsView(QGraphicsView):
             move = new_pos - self._pan_start
             self.translate(move.x(), move.y())
             self._pan_start = self.mapToScene(event.pos())
+        if not self.children()[3].slide_loader.status_update():
+            self.children()[3].slide_loader.start_updating()
         super(GraphicsView, self).mouseMoveEvent(event)
 
     def keyPressEvent(self, event):
-        """Calls loadimage if key "l" is pressed
+        """
+        Calls loadimage if key "l" is pressed
         :param event: event to initialize the function
         :type event: QMouseEvent
         :return: /

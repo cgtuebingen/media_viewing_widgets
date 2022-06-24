@@ -12,7 +12,7 @@ class ZoomDict(TypedDict):
 
 
 class SlideLoader(QObject):
-    start_updating = pyqtSignal()
+    update_slides = pyqtSignal()
 
     def __init__(self, filepath: str, width: int, height: int):
         super(SlideLoader, self).__init__()
@@ -31,11 +31,12 @@ class SlideLoader(QObject):
         self.view_width: int = None
         self.view_height: int = None
         self._stack_mutex = QMutex()
+        self._updating_slides: bool = True
 
-        self.start_updating.connect(self.set_zoom_stack, Qt.ConnectionType.QueuedConnection)
+        self.update_slides.connect(self.updating_zoom_stack, Qt.ConnectionType.QueuedConnection)
         self.set_slide(filepath)
         self.update_slide_size(width=width, height=height)
-        self.set_zoom_stack()  # call it ones to ensure a stack is loaded
+        self.updating_zoom_stack()
 
     def set_slide(self, filepath: str):
         self.slide = OpenSlide(filepath)    # not included in constructor in case a new file os loaded
@@ -57,11 +58,11 @@ class SlideLoader(QObject):
                 self.num_lvl += 1
 
         """calculate the required size for the slides:
-        factor "2" as panning buffer, factor "1" as buffer for higher levels, factor "1" buffer for lower levels"""
-        resize_fac = 2 * 1 * np.array(self.slide.level_dimensions)[self.num_lvl, dim] / size
+        factor "2" as panning buffer"""
+        resize_fac = 2 * np.array(self.slide.level_dimensions)[self.num_lvl, dim] / size
         level_dimensions = np.asarray([self.view_width, self.view_height])
         for n in range(self.num_lvl, 0, -1):
-            self.slide_size.append((level_dimensions * resize_fac * 1 ** n).astype(int))
+            self.slide_size.append((level_dimensions * resize_fac).astype(int))
         self.slide_size.append(np.asarray(self.slide.level_dimensions[self.num_lvl]).astype(int)) # append the upper slide with no resize factor
 
         self.mouse_pos = (np.asarray(self.slide.level_dimensions[0]) / 2).astype(int)
@@ -69,7 +70,7 @@ class SlideLoader(QObject):
         self.new_file = True
 
     @pyqtSlot()
-    def set_zoom_stack(self):
+    def updating_zoom_stack(self):
         new_stack: Dict[int, ZoomDict] = {}  # clear stack
 
         """set the centers for lowest and highest level"""
@@ -87,13 +88,17 @@ class SlideLoader(QObject):
             distance[0] = 1 if distance[0] == 0 else distance[0]  # geometrical space cannot work with "0"
             distance[1] = 1 if distance[1] == 0 else distance[1]  # geometrical space cannot work with "0"
             if center_low_lvl[0] <= center_high_lvl[0]:
-                centers_x = center_low_lvl[0] + np.around(np.geomspace(0.1, distance[0], num=self.num_lvl+1)).astype(int)
+                centers_x = center_low_lvl[0] + np.around(np.geomspace(0.1, distance[0], num=self.num_lvl+1),
+                                                          decimals=1)
             else:
-                centers_x = center_low_lvl[0] - np.around(np.geomspace(0.1, distance[0], num=self.num_lvl+1)).astype(int)
+                centers_x = center_low_lvl[0] - np.around(np.geomspace(0.1, distance[0], num=self.num_lvl+1),
+                                                          decimals=1)
             if center_low_lvl[1] <= center_high_lvl[1]:
-                centers_y = center_low_lvl[1] + np.around(np.geomspace(0.1, distance[1], num=self.num_lvl+1)).astype(int)
+                centers_y = center_low_lvl[1] + np.around(np.geomspace(0.1, distance[1], num=self.num_lvl+1),
+                                                          decimals=1)
             else:
-                centers_y = center_low_lvl[1] - np.around(np.geomspace(0.1, distance[1], num=self.num_lvl+1)).astype(int)
+                centers_y = center_low_lvl[1] - np.around(np.geomspace(0.1, distance[1], num=self.num_lvl+1),
+                                                          decimals=1)
             slide_centers = np.stack([centers_x, centers_y], axis=1)
 
             """update the stack with the calculated centers"""
@@ -105,9 +110,30 @@ class SlideLoader(QObject):
                 self._zoom_stack = new_stack
             self.old_center = center_low_lvl
         self.new_file = False
-        self.start_updating.emit()  # use a signal for constant updating
+        if self._updating_slides:
+            self.update_slides.emit()  # use a signal for constant updating
 
     def get_zoom_stack(self):
         with QMutexLocker(self._stack_mutex):
             return self._zoom_stack
+
+    def start_updating(self):
+        """
+        Starts updating the slides under the mouse position
+        :return: /
+        """
+        self._updating_slides = True
+        self.updating_zoom_stack()  # call it again to restart
+
+    def stop_updating(self):
+        """
+        Stops the current updating of the slides under the mouse position
+        :return: /
+        """
+        self._updating_slides = False
+
+    def status_update(self):
+        return self._updating_slides
+
+
 
