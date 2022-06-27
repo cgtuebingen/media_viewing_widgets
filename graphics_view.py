@@ -63,6 +63,7 @@ class GraphicsView(QGraphicsView):
         :param event: event to initialize the function
         :type event: QWheelEvent
         :return: /
+        TODO: Crash can occur when resizing and directly zooming in
         """
         old_pos = self.mapToScene(event.pos())
         scale_factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
