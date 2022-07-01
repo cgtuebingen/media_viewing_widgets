@@ -11,25 +11,17 @@ class BaseGraphicsScene(QGraphicsScene):
 
 
 if __name__ == '__main__':
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True) # enable highdpi scaling
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)    # use highdpi icons
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)     # enable highdpi scaling
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)        # use highdpi icons
     app = QApplication(['test'])
-    """
-    The order of initializing is important.
-    1. GraphicsView
-    2. SlideView
-    """
-    viewer = GraphicsView()
-    file = QFileDialog().getOpenFileName()[0]
-    slide_view = SlideView(filepath=file, width=viewer.viewport().width(), height=viewer.viewport().height())
-    scene = BaseGraphicsScene()
 
-    viewer.setScene(scene)
+    slide_view = SlideView(filepath=QFileDialog().getOpenFileName()[0])
+
+    scene = BaseGraphicsScene()
     scene.addItem(slide_view)
 
-    slide_view.setParent(scene)
-    slide_view.setParent(viewer)
-
+    viewer = GraphicsView()
+    viewer.setScene(scene)
     viewer.show()
 
     app.exec()

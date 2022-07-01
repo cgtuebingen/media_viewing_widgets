@@ -29,22 +29,21 @@ class GraphicsView(QGraphicsView):
         """
         Loads a new file
         :return: /
-        :return:
         """
         filepath = QFileDialog().getOpenFileName()[0]
-        self.children()[3].load_new_image(filepath=filepath)
+        number_item = 1     # this might change in over applications
+        self.scene().items()[number_item].load_new_image(filepath=filepath)
         self.fitInView()
 
     def fitInView(self, *__args):
         """
-        Resets the view to the original size and resets the slide level
+        Resets the view to the original size and resets the _slide level
         :param __args: /
         :type __args: /
         :return: /
         """
         if self.scene():    # don't run code without a scene, prevents crashes
             super(GraphicsView, self).fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
-            self.children()[3].refactor_image()
 
     def resizeEvent(self, event: QResizeEvent):
         """
@@ -54,7 +53,6 @@ class GraphicsView(QGraphicsView):
         :return: /
         """
         if self.scene():    # don't run code without a scene, prevents crashes
-            self.children()[3].slide_loader.stop_updating()     # deactivating the slide update to prevent crash
             self.fitInView(self.scene().itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event: QWheelEvent):
@@ -63,7 +61,6 @@ class GraphicsView(QGraphicsView):
         :param event: event to initialize the function
         :type event: QWheelEvent
         :return: /
-        TODO: Crash can occur when resizing and directly zooming in
         """
         old_pos = self.mapToScene(event.pos())
         scale_factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
@@ -108,11 +105,6 @@ class GraphicsView(QGraphicsView):
             move = new_pos - self._pan_start
             self.translate(move.x(), move.y())
             self._pan_start = self.mapToScene(event.pos())
-        # reactivate slide update after resize of the window
-        # ToDO: possibly not the best way, but a mouse move while occur, therefore it's convenient to reactivate it here
-        # seems to slow down the program
-        if not self.children()[3].slide_loader.status_update():
-            self.children()[3].slide_loader.start_updating()
         super(GraphicsView, self).mouseMoveEvent(event)
 
     def keyPressEvent(self, event):
