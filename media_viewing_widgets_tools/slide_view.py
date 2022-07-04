@@ -2,7 +2,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import numpy as np
-from slideloader import SlideLoader
+from .slideloader import SlideLoader
 
 
 class SlideView(QGraphicsObject):

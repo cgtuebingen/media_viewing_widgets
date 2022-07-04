@@ -1,3 +1,4 @@
+from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from media_viewing_widgets_tools.slide_view import SlideView
