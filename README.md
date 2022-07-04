@@ -9,7 +9,7 @@ pip install .
 
 ## Usage
 The `slide_view` widget should be implemented in a `QGraphicsScene`, which should be integrated into a separate 
-`GraphicsView`. It can be create in one of two ways:
+`GraphicsView`.
 ```python
 class BaseGraphicsScene(QGraphicsScene):
     def __init__(self):
