@@ -128,9 +128,10 @@ class SlideView(QGraphicsObject):
     def update_image_check(self):
         """
         Checks which level can be and if unloaded areas are displayed. This function decides if a new image will be
-        displayed. It goes through all level from the goal to the current one. If a _slide fits completely into the view,
-        it will be displayed. If no _slide fits, it will stay in the current level, but checks if a corner of the view is
-        outside the _slide. If so, the current slide_level will be raised (prevents displaying of unloaded areas).
+        displayed. It goes through all level from the goal to the current one. If a _slide fits completely into the
+        view, it will be displayed. If no _slide fits, it will stay in the current level, but checks if a corner of the
+        view is outside the _slide. If so, the current slide_level will be raised (prevents displaying of unloaded
+        areas).
         :return: /
         """
         if self.scene():  # don't run code without a scene, prevents crashes
