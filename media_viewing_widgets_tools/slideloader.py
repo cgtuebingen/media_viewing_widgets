@@ -1,20 +1,21 @@
 from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from typing import Union, Dict, List
+from typing import *
 from typing_extensions import TypedDict
 import numpy as np
 from openslide import OpenSlide
 
 
 class ZoomDict(TypedDict):
-    position: np.ndarray    # pixel location of the upper left of the data
-    data: np.ndarray        # row data of the image
+    position: np.ndarray = None
+    """ pixel location of the upper left of the data """
+    data: np.ndarray = None
+    """ image pixel array """
 
 
 class SlideLoader(QObject):
     update_slides = pyqtSignal()
 
-    def __init__(self, filepath: str, width: int, height: int):
+    def __init__(self, filepath: str = None, width: int = 800, height: int = 600):
         """
         Initialization of SlideLoader
         :param filepath: path of the _slide data. The data type is based on the OpenSlide library and can handle:
@@ -22,13 +23,15 @@ class SlideLoader(QObject):
                          Philips (.tiff), Sakura (.svslide), Trestle (.tif), Ventana (.bif, .tif),
                          Generic tiled TIFF (.tif) (see openslide.org)
         :type filepath: str
-        :param width: width of the GraphicsView
-        :type width: int
-        :param height: height of the GraphicView
-        :type height: int
+
         """
         super(SlideLoader, self).__init__()
-        self._slide: OpenSlide = OpenSlide(filepath)
+
+        self._slide: OpenSlide = None
+        self.current_file = filepath
+        if filepath is not None:
+            self.set_slide(filepath, width, height)
+
         self._slide_loader_thread = QThread()
 
         self.moveToThread(self._slide_loader_thread)
@@ -46,10 +49,10 @@ class SlideLoader(QObject):
                                                          # reading and writing the _zoom_stack
         self._updating_slides: bool = True               # flag if update is running
 
-        self.update_slides.connect(self.updating_zoom_stack, Qt.ConnectionType.QueuedConnection)
-        self.update_size(width=width, height=height)
+        self.update_slides.connect(self.updating_zoom_stack, Qt.QueuedConnection)
+        self.blockSignals(True)
 
-    def set_slide(self, filepath: str):
+    def set_slide(self, filepath: str, width: int = None, height: int = None):
         """
         Loads a new _slide. Needs an update_size after loading a new image.
         :param filepath: path of the _slide data. The data type is based on the OpenSlide library and can handle:
@@ -57,10 +60,18 @@ class SlideLoader(QObject):
                          Philips (.tiff), Sakura (.svslide), Trestle (.tif), Ventana (.bif, .tif),
                          Generic tiled TIFF (.tif) (see https://openslide.org)
         :type filepath: str
-        :type filepath: str
+        :param width: width of the GraphicsView
+        :type width: int
+        :param height: height of the GraphicView
+        :type height: int
         :return: /
         """
-        self._slide = OpenSlide(filepath)    # not included in constructor in case a new file os loaded
+        self.blockSignals(True)
+        self._slide = OpenSlide(filepath)
+        self.current_file = filepath
+        if width and height:
+            self.update_size(width, height)
+        self.blockSignals(False)
 
     def update_size(self, width: int, height: int):
         """
@@ -72,6 +83,7 @@ class SlideLoader(QObject):
         :type height: int
         :return: /
         """
+        self.blockSignals(True)
         self._view_width = width     # assigned if window size changes
         self._view_height = height   # assigned if window size changes
 
@@ -97,7 +109,8 @@ class SlideLoader(QObject):
         # append the upper _slide with no resize factor (to display the original size on the highest level)
         self._slide_size.append(np.asarray(self._slide.level_dimensions[self._num_lvl]).astype(int))
         self._new_file = True       # ensure a new stack will be load
-        self.updating_zoom_stack()  # call it ones to start the update
+        self.blockSignals(False)
+        self.updating_zoom_stack()
 
     @pyqtSlot()
     def updating_zoom_stack(self):
@@ -145,10 +158,15 @@ class SlideLoader(QObject):
             slide_centers = np.stack([centers_x, centers_y], axis=1)
 
             # update the stack with the calculated centers
-            for slide_lvl in range(self._num_lvl + 1):
-                slide_pos = (slide_centers[slide_lvl, :] - self._slide_size[slide_lvl] * 2 ** slide_lvl / 2).astype(int)
-                data = np.array(self._slide.read_region(slide_pos, slide_lvl, self._slide_size[slide_lvl]).convert('RGB'))
-                new_stack.update({slide_lvl: ZoomDict(position=slide_pos, data=data)})
+            try:
+                for slide_lvl in range(self._num_lvl + 1):
+                    slide_pos = (slide_centers[slide_lvl, :] - self._slide_size[slide_lvl] * 2 ** slide_lvl / 2).astype(int)
+                    data = np.array(self._slide.read_region(slide_pos, slide_lvl, self._slide_size[slide_lvl]).convert('RGB'))
+                    new_stack.update({slide_lvl: ZoomDict(position=slide_pos, data=data)})
+            except IndexError as e:
+                if self._updating_slides:
+                    self.update_slides.emit()  # use a signal for constant updating
+                return
 
             # override the zoom_stack with QMutexLocker to prevent parallel reading and writing
             with QMutexLocker(self._stack_mutex):

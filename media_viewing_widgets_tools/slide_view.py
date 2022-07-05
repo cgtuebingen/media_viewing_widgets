@@ -8,40 +8,46 @@ from .slideloader import SlideLoader
 class SlideView(QGraphicsObject):
     start_checking = pyqtSignal()
 
-    def __init__(self, filepath: str, width: int = 880, height: int = 800):
+    def __init__(self, filepath: str = None):
         """
-        Initialization of SlideView. Important: The Graphicsview initialized first, because the SlideLoader needs the
-        size to calculate the size of the different _slide levels.
-        :param filepath: path of the _slide data. The data type is based on the OpenSlide library and can handle:
+        Initialization of SlideView.
+        :param filepath: path to the slide data. The data type is based on the OpenSlide library and can handle:
                          Aperio (.svs, .tif), Hamamatsu (.vms, .vmu, .ndpi), Leica (.scn), MIRAX (.mrxs),
                          Philips (.tiff), Sakura (.svslide), Trestle (.tif), Ventana (.bif, .tif),
                          Generic tiled TIFF (.tif) (see openslide.org)
         :type filepath: str
-        :param width: width of the GraphicsView
-        :type width: int
-        :param height: height of the GraphicView
-        :type height: int
         """
         super(SlideView, self).__init__()
 
-        self.slide_loader: SlideLoader = SlideLoader(filepath=filepath, width=width, height=height)
-        self.num_lvl: int = self.slide_loader.get_num_lvl()             # total number of _slide level
-        self.slide_lvl_active: int = self.slide_loader.get_num_lvl()    # number of current displayed _slide level
-        self.slide_lvl_goal: int = self.slide_loader.get_num_lvl()      # number of wanted _slide level after zooming
-        self.scene_pos: np.ndarray = np.array([0, 0])             # upper right position of the scene
-        self.mouse_pos: np.ndarray = self.slide_loader.get_mouse_pos()  # current mouse position on the scene
-        self.view_width: int = width                              # width of the GraphicsView
-        self.view_height: int = height                            # height of the GraphicsView
+        self.slide_loader: SlideLoader = SlideLoader()
+
+        self.scene_pos: np.ndarray = np.array([0, 0])  # upper right position of the scene
+        self.mouse_pos: np.ndarray = None  # current mouse position on the scene
+        self.view_width: int = None
+        self.view_height: int = None
+        self.num_lvl: int = None  # total number of _slide level
+        self.slide_lvl_active: int = None  # number of current displayed _slide level
+        self.slide_lvl_goal: int = None  # number of wanted _slide level after zooming
 
         self.pixmap_item: QGraphicsPixmapItem = QGraphicsPixmapItem(parent=self)
         self.setAcceptHoverEvents(True)
-        self.start_checking.connect(self.update_image_check, Qt.ConnectionType.QueuedConnection)
-        self.set_image()
-        self.update_image_check()
+        self.start_checking.connect(self.update_image_check, Qt.QueuedConnection)
+        self.in_scene: bool = self.scene() is not None
 
-    def boundingRect(self):
+        if filepath is not None:
+            self.load_new_image(filepath)
+            if self.scene():
+                if self.scene().views():
+                    self.num_lvl: int = self.slide_loader.get_num_lvl()             # total number of _slide level
+                    self.slide_lvl_active: int = self.slide_loader.get_num_lvl()    # number of current displayed _slide level
+                    self.slide_lvl_goal: int = self.slide_loader.get_num_lvl()      # number of wanted _slide level after zooming
+                    self._set_image()
+                    self.start_checking.emit()
+                    self.in_scene = True
+
+    def boundingRect(self) -> QRectF:
         """
-        This pure virtual function defines the outer bounds of the item as a rectangle; all painting must be restricted
+        This function defines the outer bounds of the item as a rectangle; all painting must be restricted
         to inside an item's bounding rect. QGraphicsView uses this to determine whether the item requires redrawing.
         :return: Returns the bounding rect of this item's descendants (i.e., its children, their children, etc.) in
         local coordinates. The rectangle will contain all descendants after they have been mapped to local coordinates.
@@ -60,7 +66,11 @@ class SlideView(QGraphicsObject):
         (see https://doc.qt.io/qt-6/qgraphicsitem.html)
         :return: /
         """
-        pass
+        if not self.in_scene and self.scene().views() is not None:
+            self.in_scene = True
+            if self.slide_loader.current_file is not None:
+                self.refactor_image()
+                self._set_image()
 
     def load_new_image(self, filepath: str):
         """
@@ -72,18 +82,22 @@ class SlideView(QGraphicsObject):
         :type filepath: str
         :return: /
         """
+        self.blockSignals(True)
         self.slide_loader.set_slide(filepath)
-        self.refactor_image()
-        self.set_image()
+        if self.in_scene:
+            self.refactor_image()
+            self._set_image()
+        self.blockSignals(False)
 
     def refactor_image(self):
         """
         Resets the metadata of a _slide after loading a new one or resizing the view.
         :return: /
         """
-        if self.scene().views()[0]:
-            self.view_width = self.scene().views()[0].viewport().width()
-            self.view_height = self.scene().views()[0].viewport().height()
+        if self.scene().views():
+            scene_viewer = self.scene().views()[0].viewport()
+            self.view_width = scene_viewer.width()
+            self.view_height = scene_viewer.height()
             self.slide_loader.update_size(width=self.view_width, height=self.view_height)
             self.num_lvl = self.slide_loader.get_num_lvl()
             self.slide_lvl_active = self.num_lvl
@@ -91,7 +105,7 @@ class SlideView(QGraphicsObject):
             self.scene_pos = np.array([0, 0])
             self.mouse_pos = self.slide_loader.get_mouse_pos()
 
-    def set_image(self):
+    def _set_image(self):
         """
         Displays the image and handles the scene position of the new image
         :return: /
@@ -104,7 +118,7 @@ class SlideView(QGraphicsObject):
         # set the image
         height, width, channel = image.shape
         bytesPerLine = 3 * width
-        q_image = QImage(image.data, width, height, bytesPerLine, QImage.Format.Format_RGB888)
+        q_image = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
         self.pixmap_item.resetTransform()
         self.pixmap_item.setPixmap(QPixmap(q_image))
 
@@ -157,7 +171,7 @@ class SlideView(QGraphicsObject):
                     view_low_right.y() < scene_low_right_goal[1]) and \
                         lvl < self.slide_lvl_active:  # to ensure that not every time an image will be displayed
                     self.slide_lvl_active = lvl
-                    self.set_image()
+                    self._set_image()
                     break   # if a _slide fits, second check is not needed (code efficiency)
 
                 # check for unloaded areas
@@ -168,12 +182,12 @@ class SlideView(QGraphicsObject):
                     self.slide_lvl_active += 1
                     if self.slide_lvl_active >= self.num_lvl:  # check if you are already on the highest level
                         self.slide_lvl_active = self.num_lvl
-                        self.set_image()
+                        self._set_image()
                         # Stop function, if on the highest level(no update is required
                         # most of the time, the view on the highest level will be outside the _slide
                         return  # prevents emitting start_checking/stops the function
 
-                    self.set_image()
+                    self._set_image()
         self.start_checking.emit()
 
     def wheelEvent(self, event: 'QGraphicsSceneWheelEvent'):
@@ -216,7 +230,7 @@ class SlideView(QGraphicsObject):
         :return: /
         """
         self.slide_lvl_active = min([self.slide_lvl_active + 1, self.num_lvl])
-        self.set_image()
+        self._set_image()
 
     def mousePressEvent(self, event: 'QGraphicsSceneMouseEvent'):
         """
