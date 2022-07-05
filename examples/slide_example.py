@@ -1,11 +1,10 @@
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
-from media_viewing_widgets_tools.slide_view import SlideView
+from PyQt6.QtWidgets import *
+from media_viewing_widgets.slide_view import SlideView
 from graphics_view import GraphicsView
 
 
 if __name__ == '__main__':
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)     # enable high dpi scaling
+    # may need High DPI scaling
     app = QApplication(['test'])
 
     slide_view = SlideView()

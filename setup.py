@@ -7,13 +7,13 @@ with open("README.md", "r") as fh:
 setup(
     name="media-viewing-widgets",
     version="0.0.1",
-    author="Daniel SChiller",
-    author_email="daniel.schiller@gmx.net",
-    description="A tool to display and zoom into slide images (like tiff data)",
+    author="",
+    author_email="",
+    description="A pyqt widget library for viewing various media formats",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/daniel89-code/media-viewing-widgets",
-    packages=['media_viewing_widgets_tools'],
+    packages=['media_viewing_widgets'],
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -22,8 +22,6 @@ setup(
     ],
     python_requires='>=3',
     install_requires=['numpy',
-                      'qtpy',
-                      'openslide',
-                      'typing',
-                      'typing_extensions']
+                      'PyQt6',
+                      'openslide-python']
 )

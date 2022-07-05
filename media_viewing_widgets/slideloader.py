@@ -1,4 +1,4 @@
-from PyQt5.QtCore import *
+from PyQt6.QtCore import *
 from typing import *
 from typing_extensions import TypedDict
 import numpy as np
@@ -49,7 +49,7 @@ class SlideLoader(QObject):
                                                          # reading and writing the _zoom_stack
         self._updating_slides: bool = True               # flag if update is running
 
-        self.update_slides.connect(self.updating_zoom_stack, Qt.QueuedConnection)
+        self.update_slides.connect(self.updating_zoom_stack, Qt.ConnectionType.QueuedConnection)
         self.blockSignals(True)
 
     def set_slide(self, filepath: str, width: int = None, height: int = None):

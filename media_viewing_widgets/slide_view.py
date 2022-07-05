@@ -1,6 +1,6 @@
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from PyQt6.QtWidgets import *
 import numpy as np
 from .slideloader import SlideLoader
 
@@ -31,7 +31,7 @@ class SlideView(QGraphicsObject):
 
         self.pixmap_item: QGraphicsPixmapItem = QGraphicsPixmapItem(parent=self)
         self.setAcceptHoverEvents(True)
-        self.start_checking.connect(self.update_image_check, Qt.QueuedConnection)
+        self.start_checking.connect(self.update_image_check, Qt.ConnectionType.QueuedConnection)
         self.in_scene: bool = self.scene() is not None
 
         if filepath is not None:
@@ -118,7 +118,7 @@ class SlideView(QGraphicsObject):
         # set the image
         height, width, channel = image.shape
         bytesPerLine = 3 * width
-        q_image = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
+        q_image = QImage(image.data, width, height, bytesPerLine, QImage.Format.Format_RGB888)
         self.pixmap_item.resetTransform()
         self.pixmap_item.setPixmap(QPixmap(q_image))
 
@@ -190,7 +190,7 @@ class SlideView(QGraphicsObject):
                     self._set_image()
         self.start_checking.emit()
 
-    def wheelEvent(self, event: 'QGraphicsSceneWheelEvent'):
+    def wheelEvent(self, event: QGraphicsSceneWheelEvent):
         """
         WheelEvent will cause a zoom. This function changes the wanted _slide level according to the zoom direction.
         Also it will set the active _slide level to the highest possible. Therefore, the "update_image_check" will handle
@@ -222,7 +222,7 @@ class SlideView(QGraphicsObject):
         self.slide_lvl_active = self.num_lvl    # set active level to highest possible
         self.start_checking.emit()  # restart the update (after pausing on highest level)
 
-    def mouseReleaseEvent(self, event: 'QGraphicsSceneMouseEvent'):
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         """
         Adds a level after panning to prevent unloaded data
         :param event: event to initialize the function
@@ -232,7 +232,7 @@ class SlideView(QGraphicsObject):
         self.slide_lvl_active = min([self.slide_lvl_active + 1, self.num_lvl])
         self._set_image()
 
-    def mousePressEvent(self, event: 'QGraphicsSceneMouseEvent'):
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         """
         Function needs to be implemented for other QGraphicsSceneMouseEvent.
         :param event: event to initialize the function
@@ -241,7 +241,7 @@ class SlideView(QGraphicsObject):
         """
         pass
 
-    def hoverMoveEvent(self, event: 'QGraphicsSceneHoverEvent'):
+    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent):
         """
         Gives the _slide loader the current mouse position
         :param event: event to initialize the function
