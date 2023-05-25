@@ -2,6 +2,14 @@ from PyQt6.QtCore import *
 from typing import *
 from typing_extensions import TypedDict
 import numpy as np
+from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from PyQt6.QtMultimedia import *
+from PyQt6.QtMultimediaWidgets import *
+import os
+openslide_path = os.path.abspath("../../openslide/bin")
+os.add_dll_directory(openslide_path)
 from openslide import OpenSlide
 
 
@@ -12,7 +20,7 @@ class ZoomDict(TypedDict):
     """ image pixel array """
 
 
-class SlideLoader(QObject):
+class SlideHandler(QObject):
     update_slides = pyqtSignal()
 
     def __init__(self, filepath: str = None, width: int = 800, height: int = 600):
@@ -25,7 +33,7 @@ class SlideLoader(QObject):
         :type filepath: str
 
         """
-        super(SlideLoader, self).__init__()
+        super(SlideHandler, self).__init__()
 
         self._slide: OpenSlide = None
         self.current_file = filepath
