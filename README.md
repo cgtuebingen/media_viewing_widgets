@@ -3,7 +3,7 @@ A tool to display and zoom into slide images (like tiff data).
 
 ## Install
 ```bash
-git clone https://github.com/daniel89-code/media-viewing-widgets.git && cd media_viewing_widgets_tools
+git clone https://github.com/cgtuebingen/media-viewing-widgets.git && cd media_viewing_widgets_tools
 pip install .
 ```
 
