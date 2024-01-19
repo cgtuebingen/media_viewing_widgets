@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="media-viewing-widgets",
+    name="widgets",
     version="0.0.1",
     author="",
     author_email="",
@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/daniel89-code/media-viewing-widgets",
-    packages=['media_viewing_widgets'],
+    packages=['widgets'],
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
