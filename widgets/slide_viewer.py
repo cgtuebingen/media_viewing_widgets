@@ -78,6 +78,11 @@ class slide_view(QGraphicsView):
             self.width = self.frameRect().width()
             self.height = self.frameRect().height()
 
+        bottom_right = QPointF(self.width * 4, self.height * 4)
+        scene_rect = QRectF(self.mouse_pos, bottom_right)
+
+        self.setSceneRect(scene_rect)
+
         self.fused_image = QPixmap(self.width * 4, self.height * 4)
         self.pixmap_item.setPixmap(self.fused_image)
 
