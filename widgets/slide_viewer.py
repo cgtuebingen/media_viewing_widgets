@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import *
 import numpy as np
 import os
 import sys
+
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("../openslide/bin")
     os.add_dll_directory(openslide_path)
@@ -17,43 +18,45 @@ class slide_view(QGraphicsView):
 
     def __init__(self, *args):
         super(slide_view, self).__init__(*args)
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
-        self.setMouseTracking(True)
 
+        # Boolean that enables and disables annotations
         self.annotationMode = False
 
+        # The slide and the path to it
         self.slide: OpenSlide = None
         self.filepath = None
 
+        # The width of the viewport and the current mouse position
         self.width = self.frameRect().width()
         self.height = self.frameRect().height()
         self.mouse_pos: QPointF = QPointF()
 
+        # Boolean for panning and the starting position of the pan
         self.panning: bool = False
         self.pan_start: QPointF = QPointF()
 
-        self.cur_downsample: float = 0.0
-        self.max_downsample: float = 0.0
-        self.cur_level_zoom: float = 0.0
-        self.level_downsamples = {}
-        self.cur_level = 0
-        self.dim_count = 0
+        # Logic for zooming
+        self.cur_downsample: float = 0.0  # Overall zoom
+        self.max_downsample: float = 0.0  # The largest zoom out possible
+        self.cur_level_zoom: float = 0.0  # relative zoom of the current level
+        self.level_downsamples = {}  # Lowest zoom for all levels
+        self.cur_level = 0  # Current level for the zoom
 
-        self.fused_image = QPixmap()
-        self.painter = QPainter(self.fused_image)
-        self.pixmap_item = QGraphicsPixmapItem()
-        self.pixmap_item.setPixmap(self.fused_image)
+        # Display logic
+        self.fused_image = QPixmap()  # Pixmap that displays the image
+        self.painter = QPainter(self.fused_image)  # Painter that draws the pixmap
+        self.pixmap_item = QGraphicsPixmapItem()  # "Container" of the pixmap
+        self.anchor_point = QPoint()  # Anchorpoint of the image in the pixmap
+        self.image_patches = {}  # Storage of previously created patches of the image
 
-        self.anchor_point = QPoint()
-        self.image_patches = {}
-
-        self.max_threads = 16  # os.cpu_count()
+        # Threading logic
+        self.max_threads = os.cpu_count()
         self.sqrt_thread_count = int(np.sqrt(self.max_threads))
 
+        # Boolean that is set to true if there is a level crossing (or all patches have to be reloaded)
         self.zoomed = True
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
@@ -70,6 +73,13 @@ class slide_view(QGraphicsView):
         :type height: int
         :return: /
         """
+        # TODO: Temporary solution for saving the zoom and movement of the current wsi slide.
+        #  This will not save the zoom if the user switches to any other whole slide image.
+        if self.filepath and self.filepath == filepath:
+            self.update_pixmap()
+            self.sendPixmap.emit(self.pixmap_item)
+            return
+
         self.slide = OpenSlide(filepath)
         self.filepath = filepath
         self.mouse_pos = QPointF(0, 0)
@@ -86,7 +96,6 @@ class slide_view(QGraphicsView):
         self.fused_image = QPixmap(self.width * 4, self.height * 4)
         self.pixmap_item.setPixmap(self.fused_image)
 
-        self.dim_count = self.slide.level_count
         self.level_downsamples = [self.slide.level_downsamples[level] for level in range(self.slide.level_count)]
 
         self.max_downsample = self.cur_downsample = max(self.slide.level_dimensions[0][0] / self.width,
@@ -334,8 +343,8 @@ class slide_view(QGraphicsView):
             self.pixmap_item.moveBy(-move.x(), -move.y())
             self.pan_start = new_pos
 
-            move = QPointF(move.x()*self.cur_downsample,
-                           move.y()*self.cur_downsample)
+            move = QPointF(move.x() * self.cur_downsample,
+                           move.y() * self.cur_downsample)
             self.mouse_pos += move
             self.update_pixmap()
         super(QGraphicsView, self).mouseMoveEvent(event)
