@@ -17,7 +17,8 @@ class slide_view(QGraphicsView):
     sendPixmap = pyqtSignal(QGraphicsPixmapItem)
 
     def __init__(self, *args):
-        super(slide_view, self).__init__(*args)
+        # super(slide_view, self).__init__(*args)
+        super().__init__(*args)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
@@ -53,7 +54,7 @@ class slide_view(QGraphicsView):
         self.image_patches = {}  # Storage of previously created patches of the image
 
         # Threading logic
-        self.max_threads = os.cpu_count()
+        self.max_threads = 16#os.cpu_count()
         self.sqrt_thread_count = int(np.sqrt(self.max_threads))
 
         # Boolean that is set to true if there is a level crossing (or all patches have to be reloaded)
@@ -317,7 +318,7 @@ class slide_view(QGraphicsView):
         if event.button() == Qt.MouseButton.LeftButton and not self.annotationMode:
             self.panning = True
             self.pan_start = self.mapToScene(event.pos())
-        super(QGraphicsView, self).mousePressEvent(event)
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         """
@@ -328,7 +329,8 @@ class slide_view(QGraphicsView):
         """
         if event.button() == Qt.MouseButton.LeftButton and not self.annotationMode:
             self.panning = False
-        super(QGraphicsView, self).mouseReleaseEvent(event)
+        # super(QGraphicsView, self).mouseReleaseEvent(event)
+        super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
         """
@@ -347,7 +349,9 @@ class slide_view(QGraphicsView):
                            move.y() * self.cur_downsample)
             self.mouse_pos += move
             self.update_pixmap()
-        super(QGraphicsView, self).mouseMoveEvent(event)
+        # super(QGraphicsView, self).mouseMoveEvent(event)
+        super().mouseMoveEvent(event)
+        
 
     def get_cur_zoomed_patch_width(self):
         """
