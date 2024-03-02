@@ -109,7 +109,7 @@ class slide_view(QGraphicsView):
 
         self.anchor_point = QPoint(0, 0)
 
-        self.image_patches = {i: QPixmap(self.width, self.height) for i in range(self.max_threads)}
+        self.image_patches = {i: QPixmap(self.width, self.height) for i in range(self.sqrt_thread_count**2)}
         self.image_patches = np.array(list(self.image_patches.values()))
         self.image_patches = self.image_patches.reshape([self.sqrt_thread_count, self.sqrt_thread_count])
 
