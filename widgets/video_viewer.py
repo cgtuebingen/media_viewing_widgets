@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from PyQt6.QtMultimedia import *
-from PyQt6.QtMultimediaWidgets import *
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtMultimedia import *
+from PySide6.QtMultimediaWidgets import *
 import os
 
 
@@ -10,11 +10,11 @@ class VideoPlayer(QGraphicsView):
     """
     A custom widget for playing a video with an embedded frame extractor
     """
-    media_state_changed = pyqtSignal(int)  # QMediaPlayer.state()
-    playback_position_changed = pyqtSignal(int)
-    video_duration_changed = pyqtSignal(int)
-    media_error = pyqtSignal(QMediaPlayer.Error)
-    frame_grabbed = pyqtSignal(QImage, int)
+    media_state_changed = Signal(int)  # QMediaPlayer.state()
+    playback_position_changed = Signal(int)
+    video_duration_changed = Signal(int)
+    media_error = Signal(QMediaPlayer.Error)
+    frame_grabbed = Signal(QImage, int)
 
     def __init__(self, *args):
         super(VideoPlayer, self).__init__(*args)

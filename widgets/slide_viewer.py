@@ -1,8 +1,8 @@
 import concurrent.futures as mp
 import PIL.ImageQt as ImageQT
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from PyQt6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 import numpy as np
 import os
 import sys
@@ -14,7 +14,7 @@ from openslide import OpenSlide
 
 
 class slide_view(QGraphicsView):
-    sendPixmap = pyqtSignal(QGraphicsPixmapItem)
+    sendPixmap = Signal(QGraphicsPixmapItem)
 
     def __init__(self, *args):
         # super(slide_view, self).__init__(*args)
