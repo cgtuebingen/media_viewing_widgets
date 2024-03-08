@@ -1,4 +1,3 @@
-import concurrent.futures as mp
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QThreadPool
 from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QImage
@@ -7,9 +6,6 @@ import numpy as np
 import os
 import sys
 from PIL import Image
-import time
-from scipy.ndimage import shift
-from qimage2ndarray import recarray_view, rgb_view, alpha_view
 
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("../openslide/bin")
