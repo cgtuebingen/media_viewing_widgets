@@ -312,7 +312,7 @@ class SlideView(QGraphicsView):
         if event.button() == Qt.MouseButton.LeftButton and not self.annotationMode:
             self.panning = True
             self.pan_start = self.mapToScene(event.pos())
-        super(QGraphicsView, self).mousePressEvent(event)
+        super().mousePressEvent(event)
 
     @Slot(QMouseEvent)
     def mouseReleaseEvent(self, event: QMouseEvent):
@@ -324,7 +324,7 @@ class SlideView(QGraphicsView):
         """
         if event.button() == Qt.MouseButton.LeftButton and not self.annotationMode:
             self.panning = False
-        super(QGraphicsView, self).mouseReleaseEvent(event)
+        super().mouseReleaseEvent(event)
 
     @Slot(QMouseEvent)
     def mouseMoveEvent(self, event: QMouseEvent):
@@ -344,7 +344,7 @@ class SlideView(QGraphicsView):
                            move.y() * self.cur_downsample)
             self.mouse_pos += move
             self.update_pixmap()
-        super(QGraphicsView, self).mouseMoveEvent(event)
+        super().mouseMoveEvent(event)
 
     def get_cur_zoomed_patch_width(self):
         """
