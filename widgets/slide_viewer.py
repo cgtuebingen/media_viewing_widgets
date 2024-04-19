@@ -100,13 +100,13 @@ class SlideView(QGraphicsView):
             self.width = self.frameRect().width()
             self.height = self.frameRect().height()
 
-        bottom_right = QPointF(self.slide.dimensions[0], self.slide.dimensions[1])
+        bottom_right = QPointF(self.width * 4, self.height * 4)
         scene_rect = QRectF(self.mouse_pos, bottom_right)
 
         self.setSceneRect(scene_rect)
 
-        self.fused_image = Image.new('RGBA', (self.slide.dimensions[0], self.slide.dimensions[1]))
-        self.pixmap = QPixmap(self.slide.dimensions[0], self.slide.dimensions[1])
+        self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
+        self.pixmap = QPixmap(self.width * 4, self.height * 4)
 
         self.level_downsamples = [self.slide.level_downsamples[level] for level in range(self.slide.level_count)]
 
@@ -124,8 +124,9 @@ class SlideView(QGraphicsView):
         self.zoomed = True
 
         self.update_pixmap()
-        self.scale(1 / self.cur_downsample, 1 / self.cur_downsample)
+        self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
+        print(self.viewportTransform())
 
     def update_pixmap(self):
         """
@@ -171,7 +172,8 @@ class SlideView(QGraphicsView):
             grid_width = self.get_cur_patch_width()
             grid_height = self.get_cur_patch_height()
 
-            int_mouse_pos = self.mouse_pos.toPoint()
+            int_mouse_pos = QPointF(self.viewportTransform().m31()/self.viewportTransform().m11() + self.width,
+                                    self.viewportTransform().m32()/self.viewportTransform().m22() + self.height).toPoint()
 
             new_patches = [False for _ in range(self.max_threads)]
 
@@ -318,7 +320,6 @@ class SlideView(QGraphicsView):
         """
         if event.button() == Qt.MouseButton.LeftButton and not self.annotationMode:
             self.panning = True
-            self.pan_start = self.mapToScene(event.pos())
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         super().mousePressEvent(event)
@@ -346,17 +347,6 @@ class SlideView(QGraphicsView):
         :return: /
         """
         if self.panning and not self.annotationMode:
-            new_pos = self.mapToScene(event.pos())
-            move = self.pan_start - new_pos
-            # self.pixmap_item.moveBy(-move.x(), -move.y())
-            #self.viewport().translate(-move.x(), -move.y())
-            self.pan_start = new_pos
-
-            move = QPointF(move.x() * self.cur_downsample,
-                           move.y() * self.cur_downsample)
-            #self.mouse_pos += move
-            print(self.viewportTransform())
-
             self.update_pixmap()
         super().mouseMoveEvent(event)
 
@@ -400,14 +390,12 @@ class SlideView(QGraphicsView):
 
     @Slot(QPixmap)
     def set_pixmap(self, result):
-        self.pixmap = result.scaled(self.slide.dimensions[0], self.slide.dimensions[1], Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.pixmap = result
         self.sendPixmap.emit(self.pixmap)
-        # self.pixmap_item.setPixmap(result)
-        # self.pixmap_item.setScale(1 / self.cur_level_zoom)
-        # self.pixmap_item.moveBy(self.pixmap_compensation.x(), self.pixmap_compensation.y())
-        # self.pixmap_compensation = QPointF(0, 0)
-        # self.updating = False
-        # self.zoom_finished = True
+        self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
+        self.pixmap_compensation = QPointF(0, 0)
+        self.updating = False
+        self.zoom_finished = True
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
         if not rect.isNull():
