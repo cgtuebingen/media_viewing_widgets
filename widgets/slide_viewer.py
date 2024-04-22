@@ -69,7 +69,7 @@ class SlideView(QGraphicsView):
         self.zoomed = True
         self.updating = False
         self.zoom_finished = True
-        self.debug_counter = 0
+        self.zoomed_factor = 1
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -126,7 +126,6 @@ class SlideView(QGraphicsView):
         self.update_pixmap()
         self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
-        print(self.viewportTransform())
 
     def update_pixmap(self):
         """
@@ -145,10 +144,10 @@ class SlideView(QGraphicsView):
         if not self.updating:
             new_patches = self.check_for_new_patches()
 
-            offset_anchor_point = self.anchor_point - QPoint(patch_width_slide, patch_height_slide)
-
             if any(new_patches):
                 self.updating = True
+
+                offset_anchor_point = self.anchor_point - QPoint(patch_width_slide, patch_height_slide)
                 self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
 
                 image_thread = ImageBlockWrapper(offset_anchor_point, patch_width_pix,
@@ -172,12 +171,12 @@ class SlideView(QGraphicsView):
             grid_width = self.get_cur_patch_width()
             grid_height = self.get_cur_patch_height()
 
-            int_mouse_pos = QPointF(self.viewportTransform().m31()/self.viewportTransform().m11() + self.width,
-                                    self.viewportTransform().m32()/self.viewportTransform().m22() + self.height).toPoint()
+            int_mouse_pos = QPointF(self.viewportTransform().m31()/self.viewportTransform().m11(),
+                                    self.viewportTransform().m32()/self.viewportTransform().m22()).toPoint()
 
             new_patches = [False for _ in range(self.max_threads)]
 
-            while int_mouse_pos.x() > self.anchor_point.x() + grid_width:
+            if int_mouse_pos.x() < - 2 * self.width:
                 new_patches[3] = True
                 new_patches[7] = True
                 new_patches[11] = True
@@ -186,7 +185,7 @@ class SlideView(QGraphicsView):
                 self.anchor_point += QPoint(grid_width, 0)
                 self.pixmap_compensation.setX(self.pixmap_compensation.x() + self.get_cur_zoomed_patch_width())
 
-            while int_mouse_pos.x() < self.anchor_point.x():
+            if int_mouse_pos.x() > - self.width:
                 new_patches[0] = True
                 new_patches[4] = True
                 new_patches[8] = True
@@ -195,22 +194,22 @@ class SlideView(QGraphicsView):
                 self.anchor_point -= QPoint(grid_width, 0)
                 self.pixmap_compensation.setX(self.pixmap_compensation.x() - self.get_cur_zoomed_patch_width())
 
-            while int_mouse_pos.y() > self.anchor_point.y() + grid_height:
+            if int_mouse_pos.y() < - 2 * self.height:
                 new_patches[12] = True
                 new_patches[13] = True
                 new_patches[14] = True
                 new_patches[15] = True
                 self.image_patches = self.efficient_roll(self.image_patches, -1, axis=1)
-                self.anchor_point += QPoint(0, grid_height)
+                self.anchor_point -= QPoint(0, grid_height)
                 self.pixmap_compensation.setY(self.pixmap_compensation.y() + self.get_cur_zoomed_patch_height())
 
-            while int_mouse_pos.y() < self.anchor_point.y():
+            if int_mouse_pos.y() > - self.height:
                 new_patches[0] = True
                 new_patches[1] = True
                 new_patches[2] = True
                 new_patches[3] = True
                 self.image_patches = self.efficient_roll(self.image_patches, 1, axis=1)
-                self.anchor_point -= QPoint(0, grid_height)
+                self.anchor_point += QPoint(0, grid_height)
                 self.pixmap_compensation.setY(self.pixmap_compensation.y() - self.get_cur_zoomed_patch_height())
 
         return new_patches
@@ -253,21 +252,10 @@ class SlideView(QGraphicsView):
         :return: /
         """
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        scale_factor = 1.1 if event.angleDelta().y() > 0 else 1/1.1
-        self.scale(scale_factor, scale_factor)
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        print(1 / self.viewportTransform().m11())
-        print(self.viewportTransform())
-        return
-        if not self.zoom_finished:
-            return
+        scale_factor = 1.0/1.1 if event.angleDelta().y() > 0 else 1.1
+        inv_scale_factor = 1.0 / scale_factor
 
         old_downsample = self.cur_downsample
-
-        old_mouse = self.get_mouse_vp(event)
-        mouse_vp = event.position()
-
-        scale_factor = 1.1 if event.angleDelta().y() <= 0 else 1 / 1.1
         new_downsample = min(max(self.cur_downsample * scale_factor, 0.3), self.max_downsample)
 
         if new_downsample == old_downsample:
@@ -275,39 +263,39 @@ class SlideView(QGraphicsView):
 
         if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample):
             self.zoomed = True
+            if self.cur_level > self.slide.get_best_level_for_downsample(new_downsample):
+                self.zoomed_factor = 0.5
+            else:
+                self.zoomed_factor = 2
+
+        self.scale(inv_scale_factor, inv_scale_factor)
+
+        print(f"{self.viewportTransform().m31()/self.viewportTransform().m11()} and {self.viewportTransform().m32()/self.viewportTransform().m11()}")
 
         self.cur_downsample = new_downsample
-        self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
-        old_level_zoom = self.cur_level_zoom
-
-        self.mouse_pos += mouse_vp * old_downsample * (1 - scale_factor)
-
-        #self.pixmap_item.setScale(1 / self.cur_level_zoom)
-        self.scale(1/scale_factor, 1/scale_factor)
 
         if self.zoomed:
             # TODO: This is still dependent on calling the mouse pos twice. This could be fixed by directly calculating
             #  the necessary vector. But I do not know how to calculate this vector.
             self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
-            self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
-            self.anchor_point = self.mouse_pos.toPoint()
-            tmp_pos = self.pixmap_item.pos()
-            self.pixmap_compensation += QPointF(-tmp_pos.x()-self.width / self.cur_level_zoom, -tmp_pos.y()-self.height / self.cur_level_zoom)
-            older_mouse = self.get_mouse_vp(event)
-            new_mouse = self.get_mouse_vp(event)
-            pix_move = (new_mouse - older_mouse) / self.cur_level_zoom
-            self.pixmap_compensation += pix_move
-            pix_move = old_mouse * (1 - scale_factor) / old_level_zoom
-
-            self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
-            self.pixmap_compensation += pix_move
+            self.anchor_point = QPoint((-self.viewportTransform().m31()/self.viewportTransform().m11() - self.width)
+                                       * self.level_downsamples[self.cur_level],
+                                       (- self.viewportTransform().m32()/self.viewportTransform().m22() - self.height)
+                                       * self.level_downsamples[self.cur_level])
+            #self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
+            #self.anchor_point = self.mouse_pos.toPoint()
+            # tmp_pos = self.pixmap_item.pos()
+            # self.pixmap_compensation += QPointF(-tmp_pos.x()-self.width / self.cur_level_zoom, -tmp_pos.y()-self.height / self.cur_level_zoom)
+            # older_mouse = self.get_mouse_vp(event)
+            # new_mouse = self.get_mouse_vp(event)
+            # pix_move = (new_mouse - older_mouse) / self.cur_level_zoom
+            # self.pixmap_compensation += pix_move
+            #
+            # self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
+            # self.pixmap_compensation += pix_move
             self.zoom_finished = False
 
-        else:
-            pix_move = old_mouse * (1 - scale_factor) / old_level_zoom
-
-            self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
-
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.update_pixmap()
 
     @Slot(QMouseEvent)
@@ -392,7 +380,13 @@ class SlideView(QGraphicsView):
     def set_pixmap(self, result):
         self.pixmap = result
         self.sendPixmap.emit(self.pixmap)
+        old_anchor_mode = self.transformationAnchor()
+        if not self.zoom_finished:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+            self.scale(self.zoomed_factor, self.zoomed_factor)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
+        self.setTransformationAnchor(old_anchor_mode)
         self.pixmap_compensation = QPointF(0, 0)
         self.updating = False
         self.zoom_finished = True
