@@ -261,24 +261,30 @@ class SlideView(QGraphicsView):
         if new_downsample == old_downsample:
             return
 
-        if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample):
-            self.zoomed = True
-            if self.cur_level > self.slide.get_best_level_for_downsample(new_downsample):
-                self.zoomed_factor = 0.5
-            else:
-                self.zoomed_factor = 2
-
         self.scale(inv_scale_factor, inv_scale_factor)
 
         self.cur_downsample = new_downsample
 
-        if self.zoomed:
-            # TODO: This is still dependent on calling the mouse pos twice. This could be fixed by directly calculating
-            #  the necessary vector. But I do not know how to calculate this vector.
-            offset = QPoint(-(int(self.viewportTransform().m31()/self.viewportTransform().m11()) + self.width),
-                            -(int(self.viewportTransform().m32()/self.viewportTransform().m11()) + self.height))
+        if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample):
+            self.zoomed = True
+            if self.cur_level > self.slide.get_best_level_for_downsample(new_downsample):
+                self.zoomed_factor = 0.5
+                back_scale = 1.0 / self.viewportTransform().m11()
+            else:
+                self.zoomed_factor = 2
+                back_scale = 0.5 / self.viewportTransform().m11()
+
+            self.scale(back_scale, back_scale)
+            offset = QPoint(-(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
+                            -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
             self.anchor_point = self.anchor_point + offset * self.level_downsamples[self.cur_level]
             self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
+            self.scale(1 / back_scale, 1 / back_scale)
+
+            self.zoom_finished = False
+
+        # if self.zoomed:
+
             #self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
             #self.anchor_point = self.mouse_pos.toPoint()
             # tmp_pos = self.pixmap_item.pos()
@@ -290,7 +296,7 @@ class SlideView(QGraphicsView):
             #
             # self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
             # self.pixmap_compensation += pix_move
-            self.zoom_finished = False
+            # self.zoom_finished = False
 
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.update_pixmap()
@@ -380,7 +386,7 @@ class SlideView(QGraphicsView):
         old_anchor_mode = self.transformationAnchor()
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         if not self.zoom_finished:
-            self.zoom_adjustment()
+           self.zoom_adjustment()
         self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
         self.setTransformationAnchor(old_anchor_mode)
         self.pixmap_compensation = QPointF(0, 0)
@@ -390,11 +396,16 @@ class SlideView(QGraphicsView):
         self.update_pixmap()
 
     def zoom_adjustment(self):
-        # TODO: This need to be calucalted correctly
+        # TODO: This need to be calculated correctly
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         cur_zoom = self.viewportTransform().m11()
-        cur_width = self.anchor_point.x() - ((self.viewportTransform().m31()/cur_zoom + self.width) * self.level_downsamples[self.cur_level + 1])
-        cur_height = self.viewportTransform().m32()/cur_zoom + self.height
+        # if cur_zoom > 1.0:
+        #     back_zoom = 1.0 / cur_zoom
+        # else:
+        #     back_zoom = 0.5 / cur_zoom
+        # self.scale(back_zoom, back_zoom)
+        current_width = self.viewportTransform().m31()/self.viewportTransform().m11()
+        current_height = self.viewportTransform().m32()/self.viewportTransform().m22()
         scale = self.level_downsamples[self.cur_level] / self.cur_downsample
         self.setTransform(QTransform())
         print(self.viewportTransform())
@@ -404,7 +415,11 @@ class SlideView(QGraphicsView):
                                      0, 1, 0,
                                      -offset_x, -offset_y, 1))
         self.scale(scale, scale)
-        self.translate(-self.width, -self.height)
+        self.translate(- self.width + (current_width + self.width)/0.5,
+                       -self.height + (current_height + self.height)/0.5)
+
+        print(current_width , current_height)
+
         print(self.viewportTransform())
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
