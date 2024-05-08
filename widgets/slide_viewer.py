@@ -70,6 +70,7 @@ class SlideView(QGraphicsView):
         self.updating = False
         self.zoom_finished = True
         self.zoomed_factor = 1
+        self.zoom_offset = QPointF()
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -275,9 +276,9 @@ class SlideView(QGraphicsView):
                 back_scale = 0.5 / self.viewportTransform().m11()
 
             self.scale(back_scale, back_scale)
-            offset = QPoint(-(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
+            self.zoom_offset = QPoint(-(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
                             -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
-            self.anchor_point = self.anchor_point + offset * self.level_downsamples[self.cur_level]
+            self.anchor_point = self.anchor_point + self.zoom_offset * self.level_downsamples[self.cur_level]
             self.scale(1 / back_scale, 1 / back_scale)
             self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
 
@@ -405,8 +406,8 @@ class SlideView(QGraphicsView):
         self.verticalScrollBar().setValue(0)
         self.setTransform(QTransform(scale, 0 , 0,
                                      0, scale, 0,
-                                     (-self.width + (current_width + self.width) * 2) * scale,
-                                     (-self.height + (current_height + self.height) * 2) * scale, 1.0))
+                                     (-self.width + (current_width + self.width + self.zoom_offset.x()) * 2) * scale,
+                                     (-self.height + (current_height + self.height + self.zoom_offset.y()) * 2) * scale, 1.0))
 
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
