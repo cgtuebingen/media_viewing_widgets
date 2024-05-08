@@ -1,6 +1,6 @@
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QThreadPool
-from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform
+from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform, QPen, QBrush
 from PySide6.QtWidgets import *
 import numpy as np
 import os
@@ -278,8 +278,8 @@ class SlideView(QGraphicsView):
             offset = QPoint(-(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
                             -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
             self.anchor_point = self.anchor_point + offset * self.level_downsamples[self.cur_level]
-            self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
             self.scale(1 / back_scale, 1 / back_scale)
+            self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
 
             self.zoom_finished = False
 
@@ -386,7 +386,7 @@ class SlideView(QGraphicsView):
         old_anchor_mode = self.transformationAnchor()
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         if not self.zoom_finished:
-           self.zoom_adjustment()
+            self.zoom_adjustment()
         self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
         self.setTransformationAnchor(old_anchor_mode)
         self.pixmap_compensation = QPointF(0, 0)
@@ -398,29 +398,16 @@ class SlideView(QGraphicsView):
     def zoom_adjustment(self):
         # TODO: This need to be calculated correctly
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        cur_zoom = self.viewportTransform().m11()
-        # if cur_zoom > 1.0:
-        #     back_zoom = 1.0 / cur_zoom
-        # else:
-        #     back_zoom = 0.5 / cur_zoom
-        # self.scale(back_zoom, back_zoom)
         current_width = self.viewportTransform().m31()/self.viewportTransform().m11()
         current_height = self.viewportTransform().m32()/self.viewportTransform().m22()
         scale = self.level_downsamples[self.cur_level] / self.cur_downsample
-        self.setTransform(QTransform())
-        print(self.viewportTransform())
-        offset_x = self.viewportTransform().m31()
-        offset_y = self.viewportTransform().m32()
-        self.setTransform(QTransform(1, 0, 0,
-                                     0, 1, 0,
-                                     -offset_x, -offset_y, 1))
-        self.scale(scale, scale)
-        self.translate(- self.width + (current_width + self.width)/0.5,
-                       -self.height + (current_height + self.height)/0.5)
+        self.horizontalScrollBar().setValue(0)
+        self.verticalScrollBar().setValue(0)
+        self.setTransform(QTransform(scale, 0 , 0,
+                                     0, scale, 0,
+                                     (-self.width + (current_width + self.width) * 2) * scale,
+                                     (-self.height + (current_height + self.height) * 2) * scale, 1.0))
 
-        print(current_width , current_height)
-
-        print(self.viewportTransform())
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
         if not rect.isNull():
