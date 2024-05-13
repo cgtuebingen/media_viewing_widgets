@@ -1,6 +1,7 @@
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QThreadPool
-from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform, QPen, QBrush
+from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform, \
+    QPen, QBrush
 from PySide6.QtWidgets import *
 import numpy as np
 import os
@@ -166,16 +167,21 @@ class SlideView(QGraphicsView):
         """
         if self.zoomed:
             self.zoomed = False
+            # print(f"This was zoomed at level {self.cur_level}!")
             return [True for _ in range(self.max_threads)]
-
         else:
+            # print(f"Anchor point before patch check: {self.anchor_point}")
+            # print(f"Current level is: {self.cur_level}")
             grid_width = self.get_cur_patch_width()
             grid_height = self.get_cur_patch_height()
 
-            int_mouse_pos = QPointF(self.viewportTransform().m31()/self.viewportTransform().m11(),
-                                    self.viewportTransform().m32()/self.viewportTransform().m22()).toPoint()
+            int_mouse_pos = QPointF(self.viewportTransform().m31() / self.viewportTransform().m11(),
+                                    self.viewportTransform().m32() / self.viewportTransform().m22()).toPoint()
 
             new_patches = [False for _ in range(self.max_threads)]
+
+            if not self.zoom_finished:
+                return new_patches
 
             if int_mouse_pos.x() < - 2 * self.width:
                 new_patches[3] = True
@@ -212,6 +218,8 @@ class SlideView(QGraphicsView):
                 self.image_patches = self.efficient_roll(self.image_patches, 1, axis=1)
                 self.anchor_point -= QPoint(0, grid_height)
                 self.pixmap_compensation.setY(self.pixmap_compensation.y() - self.get_cur_zoomed_patch_height())
+
+        # print(f"Anchor point after patch check: {self.anchor_point}")
 
         return new_patches
 
@@ -252,8 +260,9 @@ class SlideView(QGraphicsView):
         :type event: QWheelEvent
         :return: /
         """
+        # print(f"Anchor point before wheel event: {self.anchor_point}")
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        scale_factor = 1.0/1.1 if event.angleDelta().y() > 0 else 1.1
+        scale_factor = 1.0 / 1.1 if event.angleDelta().y() > 0 else 1.1
         inv_scale_factor = 1.0 / scale_factor
 
         old_downsample = self.cur_downsample
@@ -266,38 +275,40 @@ class SlideView(QGraphicsView):
 
         self.cur_downsample = new_downsample
 
-        if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample):
+        if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample) and self.zoom_finished:
             self.zoomed = True
             if self.cur_level > self.slide.get_best_level_for_downsample(new_downsample):
-                self.zoomed_factor = 0.5
+                self.zoomed_factor = 2
                 back_scale = 1.0 / self.viewportTransform().m11()
             else:
-                self.zoomed_factor = 2
+                self.zoomed_factor = 0.5
                 back_scale = 0.5 / self.viewportTransform().m11()
 
             self.scale(back_scale, back_scale)
-            self.zoom_offset = QPoint(-(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
-                            -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
+            self.zoom_offset = QPoint(
+                -(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
+                -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
             self.anchor_point = self.anchor_point + self.zoom_offset * self.level_downsamples[self.cur_level]
             self.scale(1 / back_scale, 1 / back_scale)
             self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
 
             self.zoom_finished = False
+            # print(f"Anchor point after wheel event: {self.anchor_point}")
 
         # if self.zoomed:
 
-            #self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
-            #self.anchor_point = self.mouse_pos.toPoint()
-            # tmp_pos = self.pixmap_item.pos()
-            # self.pixmap_compensation += QPointF(-tmp_pos.x()-self.width / self.cur_level_zoom, -tmp_pos.y()-self.height / self.cur_level_zoom)
-            # older_mouse = self.get_mouse_vp(event)
-            # new_mouse = self.get_mouse_vp(event)
-            # pix_move = (new_mouse - older_mouse) / self.cur_level_zoom
-            # self.pixmap_compensation += pix_move
-            #
-            # self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
-            # self.pixmap_compensation += pix_move
-            # self.zoom_finished = False
+        # self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
+        # self.anchor_point = self.mouse_pos.toPoint()
+        # tmp_pos = self.pixmap_item.pos()
+        # self.pixmap_compensation += QPointF(-tmp_pos.x()-self.width / self.cur_level_zoom, -tmp_pos.y()-self.height / self.cur_level_zoom)
+        # older_mouse = self.get_mouse_vp(event)
+        # new_mouse = self.get_mouse_vp(event)
+        # pix_move = (new_mouse - older_mouse) / self.cur_level_zoom
+        # self.pixmap_compensation += pix_move
+        #
+        # self.pixmap_item.moveBy(-pix_move.x(), -pix_move.y())
+        # self.pixmap_compensation += pix_move
+        # self.zoom_finished = False
 
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.update_pixmap()
@@ -382,6 +393,7 @@ class SlideView(QGraphicsView):
 
     @Slot(QPixmap)
     def set_pixmap(self, result):
+        # print(f"Anchor point before new pixmap: {self.anchor_point}")
         self.pixmap = result
         self.sendPixmap.emit(self.pixmap)
         old_anchor_mode = self.transformationAnchor()
@@ -395,20 +407,25 @@ class SlideView(QGraphicsView):
         if not self.zoom_finished:
             self.zoom_finished = True
         self.update_pixmap()
+        # print(f"Anchor point after new pixmap: {self.anchor_point}")
 
     def zoom_adjustment(self):
         # TODO: This need to be calculated correctly
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        current_width = self.viewportTransform().m31()/self.viewportTransform().m11()
-        current_height = self.viewportTransform().m32()/self.viewportTransform().m22()
+        current_width = self.viewportTransform().m31() / self.viewportTransform().m11()
+        current_height = self.viewportTransform().m32() / self.viewportTransform().m22()
         scale = self.level_downsamples[self.cur_level] / self.cur_downsample
+        self.resetTransform()
         self.horizontalScrollBar().setValue(0)
         self.verticalScrollBar().setValue(0)
-        self.setTransform(QTransform(scale, 0 , 0,
+        self.setTransform(QTransform(scale, 0, 0,
                                      0, scale, 0,
-                                     (-self.width + (current_width + self.width + self.zoom_offset.x()) * 2) * scale,
-                                     (-self.height + (current_height + self.height + self.zoom_offset.y()) * 2) * scale, 1.0))
-
+                                     (-self.width + (current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale,
+                                     (-self.height + (current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale,
+                                     1.0))
+        print( (-self.width + (current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale)
+        print((-self.height + (current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale)
+        print(self.viewportTransform())
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
         if not rect.isNull():
@@ -420,6 +437,30 @@ class SlideView(QGraphicsView):
             factor = min(view_rect.width() / scene_rect.width(),
                          view_rect.height() / scene_rect.height())
             self.scale(factor, factor)
+
+    def paintEvent(self, event):
+        # Call the parent class's paintEvent first
+        super().paintEvent(event)
+
+        # Create a QPainter object for drawing
+        painter = QPainter(self.viewport())
+
+        # Set the color and font of the text
+        painter.setPen(QColor(0, 0, 0))
+        font = painter.font()
+        font.setPointSize(12)
+        painter.setFont(font)
+
+        # Get the anchor point coordinates and the translation values
+        anchor_point_coords = f"Anchor Point: {self.anchor_point.x()}, {self.anchor_point.y()}"
+        translation_values = f"Translation: {self.viewportTransform().m31()}, {self.viewportTransform().m32()}"
+
+        # Draw the text in the left corner of the viewport
+        painter.drawText(10, 20, anchor_point_coords)
+        painter.drawText(10, 40, translation_values)
+
+        # End the QPainter object
+        painter.end()
 
 
 class ImageBlockWrapper(QThread):
