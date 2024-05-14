@@ -7,6 +7,7 @@ import numpy as np
 import os
 import sys
 from PIL import Image
+import math
 
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("./openslide/bin")
@@ -15,6 +16,10 @@ from openslide import OpenSlide
 
 
 class SlideView(QGraphicsView):
+    """
+    The SlideView class is a widget that displays a whole slide image (WSI) using the OpenSlide library.
+    It is possible to zoom in and out, pan and annotate the image.
+    """
     sendPixmap = Signal(QPixmap)
     pixmapFinished = Signal()
 
@@ -53,7 +58,6 @@ class SlideView(QGraphicsView):
         # Display logic
         self.fused_image = Image.Image()  # Image that displays the image
         self.pixmap = QPixmap()  # Pixmap that displays the image
-        # self.painter = QPainter(self.fused_image)  # Painter that draws the pixmap
         self.pixmap_item = QGraphicsPixmapItem()  # "Container" of the pixmap
         self.anchor_point = QPoint()  # Synchronous anchorpoint of the image
         self.pixmap_compensation = QPointF()
@@ -72,6 +76,7 @@ class SlideView(QGraphicsView):
         self.zoom_finished = True
         self.zoomed_factor = 1
         self.zoom_offset = QPointF()
+        self.moved = False
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -177,7 +182,7 @@ class SlideView(QGraphicsView):
 
             new_patches = [False for _ in range(self.max_threads)]
 
-            if not self.zoom_finished:
+            if not self.zoom_finished or not self.moved:
                 return new_patches
 
             if int_mouse_pos.x() < - 2 * self.width:
@@ -260,9 +265,10 @@ class SlideView(QGraphicsView):
         inv_scale_factor = 1.0 / scale_factor
 
         old_downsample = self.cur_downsample
-        new_downsample = min(max(self.cur_downsample * scale_factor, 0.3), self.max_downsample)
+        new_downsample = self.cur_downsample * scale_factor
 
-        if new_downsample == old_downsample:
+        if new_downsample == old_downsample or new_downsample > self.max_downsample or new_downsample < 0.3:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
             return
 
         self.scale(inv_scale_factor, inv_scale_factor)
@@ -329,6 +335,7 @@ class SlideView(QGraphicsView):
         """
         if self.panning and not self.annotationMode:
             self.update_pixmap()
+            self.moved = True
         super().mouseMoveEvent(event)
 
     def get_cur_zoomed_patch_width(self):
@@ -383,6 +390,8 @@ class SlideView(QGraphicsView):
         self.updating = False
         if not self.zoom_finished:
             self.zoom_finished = True
+        self.moved = False
+        self.update_pixmap()
 
     def zoom_adjustment(self):
         # TODO: This need to be calculated correctly
@@ -411,32 +420,6 @@ class SlideView(QGraphicsView):
             factor = min(view_rect.width() / scene_rect.width(),
                          view_rect.height() / scene_rect.height())
             self.scale(factor, factor)
-
-    def paintEvent(self, event):
-        # Call the parent class's paintEvent first
-        super().paintEvent(event)
-
-        # Create a QPainter object for drawing
-        painter = QPainter(self.viewport())
-
-        # Set the color and font of the text
-        painter.setPen(QColor(0, 0, 0))
-        font = painter.font()
-        font.setPointSize(12)
-        painter.setFont(font)
-
-        # Get the anchor point coordinates and the translation values
-        anchor_point_coords = f"Anchor Point: {self.anchor_point.x()}, {self.anchor_point.y()}"
-        translation_values = (f"Translation: {self.viewportTransform().m31()/self.viewportTransform().m11()},"
-                              f" {self.viewportTransform().m32()/self.viewportTransform().m22()}")
-
-        # Draw the text in the left corner of the viewport
-        painter.drawText(10, 20, anchor_point_coords)
-        painter.drawText(10, 40, translation_values)
-        painter.drawText(10, 60, f"Level: {self.cur_level}")
-
-        # End the QPainter object
-        painter.end()
 
 
 class ImageBlockWrapper(QThread):
