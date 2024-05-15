@@ -1,5 +1,5 @@
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QThreadPool
+from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QTimer
 from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform, \
     QPen, QBrush
 from PySide6.QtWidgets import *
@@ -77,6 +77,10 @@ class SlideView(QGraphicsView):
         self.zoomed_factor = 1
         self.zoom_offset = QPointF()
         self.moved = False
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_for_level_change)
+        self.timer.start(100)
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -261,6 +265,7 @@ class SlideView(QGraphicsView):
         :return: /
         """
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.moved = False
         scale_factor = 1.0 / 1.1 if event.angleDelta().y() > 0 else 1.1
         inv_scale_factor = 1.0 / scale_factor
 
@@ -275,9 +280,16 @@ class SlideView(QGraphicsView):
 
         self.cur_downsample = new_downsample
 
-        if self.cur_level != self.slide.get_best_level_for_downsample(new_downsample) and self.zoom_finished:
+        self.level_change_check(new_downsample)
+
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        self.update_pixmap()
+
+    def level_change_check(self, downsample):
+        if self.cur_level != self.slide.get_best_level_for_downsample(downsample) and self.zoom_finished:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
             self.zoomed = True
-            if self.cur_level > self.slide.get_best_level_for_downsample(new_downsample):
+            if self.cur_level > self.slide.get_best_level_for_downsample(downsample):
                 self.zoomed_factor = 2
                 back_scale = 1.0 / self.viewportTransform().m11()
             else:
@@ -293,9 +305,17 @@ class SlideView(QGraphicsView):
             self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
 
             self.zoom_finished = False
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+            self.update_pixmap()
 
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        self.update_pixmap()
+    @Slot()
+    def check_for_level_change(self):
+        """
+        Checks if the current zoom level is still the best level for the current downsample
+        :return: /
+        """
+        if self.slide:
+            self.level_change_check(self.cur_downsample)
 
     @Slot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent):
