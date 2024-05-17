@@ -1,13 +1,12 @@
-from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QTimer
-from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QColor, QImage, QTransform, \
-    QPen, QBrush
-from PySide6.QtWidgets import *
-import numpy as np
 import os
 import sys
+
+import numpy as np
 from PIL import Image
-import math
+from PIL.ImageQt import ImageQt
+from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QTimer
+from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QTransform
+from PySide6.QtWidgets import *
 
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("./openslide/bin")
@@ -52,7 +51,7 @@ class SlideView(QGraphicsView):
         self.cur_downsample: float = 0.0  # Overall zoom
         self.max_downsample: float = 0.0  # The largest zoom out possible
         self.cur_level_zoom: float = 0.0  # relative zoom of the current level
-        self.level_downsamples = {}  # Lowest zoom for all levels
+        self.level_downsamples = {}  # Lowest global zoom for all levels
         self.cur_level = 0  # Current level for the zoom
 
         # Display logic
@@ -60,12 +59,12 @@ class SlideView(QGraphicsView):
         self.pixmap = QPixmap()  # Pixmap that displays the image
         self.pixmap_item = QGraphicsPixmapItem()  # "Container" of the pixmap
         self.anchor_point = QPoint()  # Synchronous anchorpoint of the image
-        self.pixmap_compensation = QPointF()
+        self.pixmap_compensation = QPointF()  # Used to move the image after it is created
         self.image_patches = {}  # Storage of previously created patches of the image
 
         # Threading logic
-        self.max_threads = 16  # os.cpu_count()
-        self.sqrt_thread_count = int(np.sqrt(self.max_threads))
+        self.max_threads = 16
+        self.sqrt_thread_count = 4
         self.threads_finished = []
 
         self.pixmapFinished.connect(self.set_pixmap)
@@ -81,6 +80,8 @@ class SlideView(QGraphicsView):
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_level_change)
         self.timer.start(100)
+
+        self.image_thread = None
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -161,13 +162,13 @@ class SlideView(QGraphicsView):
                 offset_anchor_point = self.anchor_point - QPoint(patch_width_slide, patch_height_slide)
                 self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
 
-                image_thread = ImageBlockWrapper(offset_anchor_point, patch_width_pix,
+                self.image_thread = ImageBlockWrapper(offset_anchor_point, patch_width_pix,
                                                  patch_height_pix, patch_width_slide, patch_height_slide,
                                                  self.sqrt_thread_count, new_patches, self, self.max_threads,
                                                  self.slide,
                                                  self.cur_level, self.image_patches, self.fused_image)
-                image_thread.finished.connect(self.set_pixmap)
-                image_thread.start()
+                self.image_thread.finished.connect(self.set_pixmap)
+                self.image_thread.start()
 
     def check_for_new_patches(self) -> list[bool]:
         """
@@ -415,7 +416,6 @@ class SlideView(QGraphicsView):
         self.update_pixmap()
 
     def zoom_adjustment(self):
-        # TODO: This need to be calculated correctly
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         current_width = self.viewportTransform().m31() / self.viewportTransform().m11()
         current_height = self.viewportTransform().m32() / self.viewportTransform().m22()
