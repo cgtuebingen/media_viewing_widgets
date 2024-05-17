@@ -111,8 +111,8 @@ class SlideView(QGraphicsView):
             self.width = self.frameRect().width()
             self.height = self.frameRect().height()
 
-        bottom_right = QPointF(self.width * 4, self.height * 4)
-        scene_rect = QRectF(self.mouse_pos, bottom_right)
+        bottom_right = QPointF(self.slide.dimensions[0], self.slide.dimensions[1])
+        scene_rect = QRectF(-bottom_right, bottom_right)
 
         self.setSceneRect(scene_rect)
 
@@ -289,12 +289,13 @@ class SlideView(QGraphicsView):
         if self.cur_level != self.slide.get_best_level_for_downsample(downsample) and self.zoom_finished:
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
             self.zoomed = True
+            level_diff = self.cur_level - self.slide.get_best_level_for_downsample(downsample)
             if self.cur_level > self.slide.get_best_level_for_downsample(downsample):
-                self.zoomed_factor = 2
-                back_scale = 1.0 / self.viewportTransform().m11()
+                self.zoomed_factor = 2**level_diff
+                back_scale = (0.5 * self.zoomed_factor) / self.viewportTransform().m11()
             else:
-                self.zoomed_factor = 0.5
-                back_scale = 0.5 / self.viewportTransform().m11()
+                self.zoomed_factor = 0.5**(-level_diff)
+                back_scale = self.zoomed_factor / self.viewportTransform().m11()
 
             self.scale(back_scale, back_scale)
             self.zoom_offset = QPoint(
