@@ -140,95 +140,129 @@ class SlideView(QGraphicsView):
 
     def update_pixmap(self):
         """
-        This method updated the pixmap.
-        It should only be called when the pixmap is moved or zoomed.
+        This method handles the updated of the pixmap.
+        If there is nothing to updated, this method will do nothing.
+        If there are patches to update, the method will launch an asynchronous thread to update the pixmap.
         :return: /
         """
-        self.width = self.frameRect().width()
-        self.height = self.frameRect().height()
-
-        patch_width_pix = int(self.width)
-        patch_height_pix = int(self.height)
-        patch_width_slide = int(self.get_cur_patch_width())
-        patch_height_slide = int(self.get_cur_patch_height())
-
+        # Check if the image is currently being updated
         if not self.updating:
             new_patches = self.check_for_new_patches()
 
             if any(new_patches):
                 self.updating = True
 
+                # Resetting width and height
+                self.width = self.frameRect().width()
+                self.height = self.frameRect().height()
+
+                # Setting the current patch width and height
+                patch_width = int(self.width)
+                patch_height = int(self.height)
+                # Setting the current patch width and height on level 0
+                patch_width_slide = int(self.get_cur_patch_width_slide())
+                patch_height_slide = int(self.get_cur_patch_height_slide())
+
+                # Calculate the upper left corner of the pixmap on slide level 0
                 offset_anchor_point = self.anchor_point - QPoint(patch_width_slide, patch_height_slide)
+                # Setting the fused_image height and width
                 self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
 
-                self.image_thread = ImageBlockWrapper(offset_anchor_point, patch_width_pix,
-                                                      patch_height_pix, patch_width_slide, patch_height_slide,
-                                                      self.sqrt_thread_count, new_patches, self, self.max_threads,
-                                                      self.slide,
-                                                      self.cur_level, self.image_patches, self.fused_image)
+                # Creating a new thread to load the patches asynchronously
+                # Giving it all the parameters it needs to create the patches correctly
+                self.image_thread = ImageBlockWrapper(parent=self,
+                                                      offset_anchor_point=offset_anchor_point,
+                                                      block_width=patch_width,
+                                                      block_height=patch_height,
+                                                      block_width_slide=patch_width_slide,
+                                                      block_height_slide=patch_height_slide,
+                                                      sqrt_threads=self.sqrt_thread_count,
+                                                      generate_new=new_patches,
+                                                      max_threads=self.max_threads,
+                                                      slide=self.slide,
+                                                      cur_level=self.cur_level,
+                                                      image_patches=self.image_patches,
+                                                      fused_image=self.fused_image)
                 self.image_thread.finished.connect(self.set_pixmap)
                 self.image_thread.start()
 
     def check_for_new_patches(self) -> list[bool]:
         """
-        This method checks if new patches need to be loaded
+        This method checks if new patches need to be loaded.
         :return: A list of booleans
         """
         if self.zoomed:
+            # If zoomed is set to true all patches will be reloaded.
             self.zoomed = False
             return [True for _ in range(self.max_threads)]
         else:
-            grid_width = self.get_cur_patch_width()
-            grid_height = self.get_cur_patch_height()
+            grid_width_slide = self.get_cur_patch_width_slide()
+            grid_height_slide = self.get_cur_patch_height_slide()
 
-            int_mouse_pos = QPointF(self.viewportTransform().m31() / self.viewportTransform().m11(),
-                                    self.viewportTransform().m32() / self.viewportTransform().m22()).toPoint()
+            # calculate current position of the upper left corner of the viewport
+            int_upper_left = QPointF(self.viewportTransform().m31() / self.viewportTransform().m11(),
+                                     self.viewportTransform().m32() / self.viewportTransform().m22()).toPoint()
 
             new_patches = [False for _ in range(self.max_threads)]
 
-            if not self.zoom_finished or not self.moved:
+            # Check if the image was moved. If the image was moved but the zoom is not finished, this will also be false
+            if not self.moved:
                 return new_patches
 
-            if int_mouse_pos.x() < - 2 * self.width:
+            # Checks if the image was moved over the threshold to the right
+            if int_upper_left.x() < - 2 * self.width:
                 new_patches[3] = True
                 new_patches[7] = True
                 new_patches[11] = True
                 new_patches[15] = True
                 self.image_patches = self.efficient_roll(self.image_patches, -1, axis=0)
-                self.anchor_point += QPoint(grid_width, 0)
+                self.anchor_point += QPoint(grid_width_slide, 0)
                 self.pixmap_compensation.setX(self.pixmap_compensation.x() + self.width)
 
-            if int_mouse_pos.x() > - self.width:
+            # Checks if the image was moved over the threshold to the left
+            if int_upper_left.x() > - self.width:
                 new_patches[0] = True
                 new_patches[4] = True
                 new_patches[8] = True
                 new_patches[12] = True
                 self.image_patches = self.efficient_roll(self.image_patches, 1, axis=0)
-                self.anchor_point -= QPoint(grid_width, 0)
+                self.anchor_point -= QPoint(grid_width_slide, 0)
                 self.pixmap_compensation.setX(self.pixmap_compensation.x() - self.width)
 
-            if int_mouse_pos.y() < - 2 * self.height:
+            # Checks if the image was moved over the threshold below
+            if int_upper_left.y() < - 2 * self.height:
                 new_patches[12] = True
                 new_patches[13] = True
                 new_patches[14] = True
                 new_patches[15] = True
                 self.image_patches = self.efficient_roll(self.image_patches, -1, axis=1)
-                self.anchor_point += QPoint(0, grid_height)
+                self.anchor_point += QPoint(0, grid_height_slide)
                 self.pixmap_compensation.setY(self.pixmap_compensation.y() + self.height)
 
-            if int_mouse_pos.y() > - self.height:
+            # Checks if the image was moved over the threshold above
+            if int_upper_left.y() > - self.height:
                 new_patches[0] = True
                 new_patches[1] = True
                 new_patches[2] = True
                 new_patches[3] = True
                 self.image_patches = self.efficient_roll(self.image_patches, 1, axis=1)
-                self.anchor_point -= QPoint(0, grid_height)
+                self.anchor_point -= QPoint(0, grid_height_slide)
                 self.pixmap_compensation.setY(self.pixmap_compensation.y() - self.height)
 
         return new_patches
 
     @staticmethod
-    def efficient_roll(arr, direction, axis):
+    def efficient_roll(arr: np._typing.NDArray, direction: int, axis: int) -> np._typing.NDArray or Exception:
+        """
+        This is an implementation of a numpy roll function, since the original numpy roll function is inefficient.
+        :param arr: This is the array to be rolled
+        :type arr: Numpy Array
+        :param direction: This is the direction of which the array is to be rolled in
+        :type direction: Integer
+        :param axis: This is the axis of the roll
+        :type axis: Integer
+        :return: The rolled array
+        """
         width, height = arr.shape[:2]
         if axis == 0:
             if direction == -1:
@@ -239,8 +273,7 @@ class SlideView(QGraphicsView):
             if direction == -1:
                 return np.concatenate((arr[:, 1:height], arr[:, 0:1]), axis=1)
             if direction == 1:
-                debug = np.concatenate((arr[:, height - 1:height], arr[:, :height - 1]), axis=1)
-                return debug
+                return np.concatenate((arr[:, height - 1:height], arr[:, :height - 1]), axis=1)
         return Exception(f'An incorrect axis: {axis} or an incorrect direction: {direction} was chosen!')
 
     def setAnnotationMode(self, b: bool):
@@ -347,7 +380,8 @@ class SlideView(QGraphicsView):
         """
         if self.panning and not self.annotationMode:
             self.update_pixmap()
-            self.moved = True
+            if self.zoom_finished:
+                self.moved = True
         super().mouseMoveEvent(event)
 
     def get_cur_zoomed_patch_width(self):
@@ -364,14 +398,14 @@ class SlideView(QGraphicsView):
         """
         return self.height / self.cur_level_zoom
 
-    def get_cur_patch_width(self):
+    def get_cur_patch_width_slide(self):
         """
         Utility method to calculate the current width of a patch given by the current level
         :return: zoomed patch width
         """
         return int(self.width * self.level_downsamples[self.cur_level])
 
-    def get_cur_patch_height(self):
+    def get_cur_patch_height_slide(self):
         """
         Utility method to calculate the current height of a patch given by the current level
         :return: zoomed patch height
@@ -436,9 +470,8 @@ class SlideView(QGraphicsView):
 class ImageBlockWrapper(QThread):
     finished = Signal(QPixmap)
 
-    def __init__(self, offset_anchor_point, block_width, block_height,
-                 block_width_slide, block_height_slide, sqrt_threads, generate_new, parent, max_threads, slide,
-                 cur_level, image_patches, fused_image):
+    def __init__(self, parent, offset_anchor_point, block_width, block_height, block_width_slide, block_height_slide,
+                 sqrt_threads, generate_new, max_threads, slide, cur_level, image_patches, fused_image):
         super().__init__(parent)
         self.offset_anchor_point = offset_anchor_point
         self.block_width = block_width
