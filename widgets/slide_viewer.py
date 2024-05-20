@@ -1,12 +1,12 @@
 import os
 import sys
-
 import numpy as np
+
 from PIL import Image
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QTimer
 from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QTransform
-from PySide6.QtWidgets import *
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPixmapItem
 
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("./openslide/bin")
@@ -24,6 +24,8 @@ class SlideView(QGraphicsView):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        # Configuration of the QGraphicsView
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -31,57 +33,45 @@ class SlideView(QGraphicsView):
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate)
         self.setMouseTracking(True)
 
-        # Boolean that enables and disables annotations
-        self.annotationMode = False
+        # State Booleans
+        self.annotationMode = False  # Annotation mode active
+        self.updating = False  # Image is currently updating
+        self.panning = False  # Image can be panned
+        self.moved = False  # Image has been moved
+        self.zoomed = True  # Image has been zoomed
+        self.zoom_finished = True  # Zoom operation is finished
 
-        # The slide and the path to it
-        self.slide: OpenSlide = None
-        self.filepath = None
+        # Slide and Filepath
+        self.slide = None  # OpenSlide object
+        self.filepath = None  # Path to the slide
 
-        # The width of the viewport and the current mouse position
+        # Viewport Dimensions
         self.width = self.frameRect().width()
         self.height = self.frameRect().height()
-        self.mouse_pos: QPointF = QPointF()
 
-        # Boolean for panning and the starting position of the pan
-        self.panning: bool = False
-        self.pan_start: QPointF = QPointF()
-
-        # Logic for zooming
-        self.cur_downsample: float = 0.0  # Overall zoom
-        self.max_downsample: float = 0.0  # The largest zoom out possible
-        self.cur_level_zoom: float = 0.0  # relative zoom of the current level
+        # Zoom Logic
+        self.cur_downsample = 0.0  # Current global zoom
+        self.max_downsample = 0.0  # Maximum zoom out
+        self.cur_level_zoom = 0.0  # Relative zoom of current level
         self.level_downsamples = {}  # Lowest global zoom for all levels
-        self.cur_level = 0  # Current level for the zoom
+        self.cur_level = 0  # Current zoom level
+        self.zoom_offset = QPointF()  # Offset for zoom when setting the new anchor point
+        self.zoomed_factor = 1  # Zoom factor when setting the new anchor point
 
-        # Display logic
-        self.fused_image = Image.Image()  # Image that displays the image
-        self.pixmap = QPixmap()  # Pixmap that displays the image
-        self.pixmap_item = QGraphicsPixmapItem()  # "Container" of the pixmap
-        self.anchor_point = QPoint()  # Synchronous anchorpoint of the image
-        self.pixmap_compensation = QPointF()  # Used to move the image after it is created
-        self.image_patches = {}  # Storage of previously created patches of the image
+        # Display Logic
+        self.fused_image = Image.Image()  # Image container to store the image patches too
+        self.pixmap = QPixmap()  # Pixmap that stores the current image
+        self.anchor_point = QPoint()  # Anchor point for the image
+        self.pixmap_compensation = QPointF()  # Compensation to move image after creation
+        self.image_patches = {}  # Storage for image patches
 
-        # Threading logic
-        self.max_threads = 16
-        self.sqrt_thread_count = 4
-        self.threads_finished = []
+        # Threading Logic
+        self.max_threads = 16  # Maximum number of threads
+        self.sqrt_thread_count = 4  # Square root of thread count
+        self.image_thread = None  # Thread for image processing
 
-        self.pixmapFinished.connect(self.set_pixmap)
-
-        # Boolean that is set to true if there is a level crossing (or all patches have to be reloaded)
-        self.zoomed = True
-        self.updating = False
-        self.zoom_finished = True
-        self.zoomed_factor = 1
-        self.zoom_offset = QPointF()
-        self.moved = False
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_for_level_change)
-        self.timer.start(100)
-
-        self.image_thread = None
+        # Signal Connections
+        self.pixmapFinished.connect(self.set_pixmap)  # sends finished pixmap
 
     def load_slide(self, filepath: str, width: int = None, height: int = None):
         """
@@ -101,41 +91,50 @@ class SlideView(QGraphicsView):
         #  This will not save the zoom if the user switches to any other whole slide image.
         if self.filepath and self.filepath == filepath:
             self.update_pixmap()
-            self.sendPixmap.emit(self.pixmap_item)
+            self.sendPixmap.emit(self.pixmap)
             return
 
+        # Setting slide and filepath
         self.slide = OpenSlide(filepath)
         self.filepath = filepath
-        self.mouse_pos = QPointF(0, 0)
 
+        # If there are no width and height given at the initialization, set the width and height of the Viewport
         if not width or not height:
             self.width = self.frameRect().width()
             self.height = self.frameRect().height()
 
+        # Calculate the size of the scene (double the image size)
         bottom_right = QPointF(self.slide.dimensions[0], self.slide.dimensions[1])
         scene_rect = QRectF(-bottom_right, bottom_right)
-
         self.setSceneRect(scene_rect)
 
+        # Initialize the pixmap and the fused image as 4 times the size of the Viewport
         self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
         self.pixmap = QPixmap(self.width * 4, self.height * 4)
 
+        # Set Zoom and Level Parameters:
+        # set all downsamples for each level
         self.level_downsamples = [self.slide.level_downsamples[level] for level in range(self.slide.level_count)]
-
+        # set the maximum downsample (global zoom out) and the current downsample
         self.max_downsample = self.cur_downsample = max(self.slide.level_dimensions[0][0] / self.width,
                                                         self.slide.level_dimensions[0][1] / self.height)
+        # set the best level for the current downsample (zoom)
         self.cur_level = self.slide.get_best_level_for_downsample(self.max_downsample)
+        # set the relative zoom of the current level
         self.cur_level_zoom = self.cur_downsample / self.level_downsamples[self.cur_level]
-
+        # Set the anchor point to the top left corner of the viewport and to (0,0) at the lowest level
         self.anchor_point = QPoint(0, 0)
 
+        # Initialize storage for the image patches
         self.image_patches = [QPixmap(self.width, self.height) for _ in range(self.max_threads)]
         self.image_patches = np.array(self.image_patches)
         self.image_patches = self.image_patches.reshape([self.sqrt_thread_count, self.sqrt_thread_count])
 
+        # Set zoomed to true to update the whole pixmap (all patches)
         self.zoomed = True
-
         self.update_pixmap()
+
+        # Set the correct scale and offset for the displayed image
         self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
 
@@ -163,10 +162,10 @@ class SlideView(QGraphicsView):
                 self.fused_image = Image.new('RGBA', (self.width * 4, self.height * 4))
 
                 self.image_thread = ImageBlockWrapper(offset_anchor_point, patch_width_pix,
-                                                 patch_height_pix, patch_width_slide, patch_height_slide,
-                                                 self.sqrt_thread_count, new_patches, self, self.max_threads,
-                                                 self.slide,
-                                                 self.cur_level, self.image_patches, self.fused_image)
+                                                      patch_height_pix, patch_width_slide, patch_height_slide,
+                                                      self.sqrt_thread_count, new_patches, self, self.max_threads,
+                                                      self.slide,
+                                                      self.cur_level, self.image_patches, self.fused_image)
                 self.image_thread.finished.connect(self.set_pixmap)
                 self.image_thread.start()
 
@@ -292,10 +291,10 @@ class SlideView(QGraphicsView):
             self.zoomed = True
             level_diff = self.cur_level - self.slide.get_best_level_for_downsample(downsample)
             if self.cur_level > self.slide.get_best_level_for_downsample(downsample):
-                self.zoomed_factor = 2**level_diff
+                self.zoomed_factor = 2 ** level_diff
                 back_scale = (0.5 * self.zoomed_factor) / self.viewportTransform().m11()
             else:
-                self.zoomed_factor = 0.5**(-level_diff)
+                self.zoomed_factor = 0.5 ** (-level_diff)
                 back_scale = self.zoomed_factor / self.viewportTransform().m11()
 
             self.scale(back_scale, back_scale)
@@ -309,15 +308,6 @@ class SlideView(QGraphicsView):
             self.zoom_finished = False
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
             self.update_pixmap()
-
-    @Slot()
-    def check_for_level_change(self):
-        """
-        Checks if the current zoom level is still the best level for the current downsample
-        :return: /
-        """
-        if self.slide:
-            self.level_change_check(self.cur_downsample)
 
     @Slot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent):
@@ -426,9 +416,9 @@ class SlideView(QGraphicsView):
         self.setTransform(QTransform(scale, 0, 0,
                                      0, scale, 0,
                                      (-self.width + (
-                                                 current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale,
+                                             current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale,
                                      (-self.height + (
-                                                 current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale,
+                                             current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale,
                                      1.0))
 
     def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
