@@ -170,8 +170,7 @@ class SlideView(QGraphicsView):
 
                 # Creating a new thread to load the patches asynchronously
                 # Giving it all the parameters it needs to create the patches correctly
-                self.image_thread = ImageBlockWrapper(parent=self,
-                                                      offset_anchor_point=offset_anchor_point,
+                self.image_thread = ImageBlockWrapper(offset_anchor_point=offset_anchor_point,
                                                       block_width=patch_width,
                                                       block_height=patch_height,
                                                       block_width_slide=patch_width_slide,
@@ -252,9 +251,10 @@ class SlideView(QGraphicsView):
         return new_patches
 
     @staticmethod
-    def efficient_roll(arr: np._typing.NDArray, direction: int, axis: int) -> np._typing.NDArray or Exception:
+    def efficient_roll(arr: np._typing.NDArray, direction: int, axis: int) -> np._typing.NDArray | Exception:
         """
-        This is an implementation of a numpy roll function, since the original numpy roll function is inefficient.
+        This is a function that mimics the behavior of the numpy roll function,
+        since the original numpy roll function is inefficient.
         :param arr: This is the array to be rolled
         :type arr: Numpy Array
         :param direction: This is the direction of which the array is to be rolled in
@@ -277,11 +277,16 @@ class SlideView(QGraphicsView):
         return Exception(f'An incorrect axis: {axis} or an incorrect direction: {direction} was chosen!')
 
     def setAnnotationMode(self, b: bool):
+        """
+        This method sets the annotation Mode of the Slide Widget
+        :param b: Boolean to set the annotation mode to
+        :return: /
+        """
         self.annotationMode = b
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """
-        Updates the pixmap of the widget is resized
+        Updates the pixmap of the widget if it is resized.
         :param event: event to initialize the function
         :return: /
         """
@@ -292,55 +297,144 @@ class SlideView(QGraphicsView):
     @Slot(QWheelEvent)
     def wheelEvent(self, event: QWheelEvent):
         """
-        Scales the image and moves into the mouse position
+        Zooming event in context to the mouse position.
         :param event: event to initialize the function
         :type event: QWheelEvent
         :return: /
         """
+        # Setting the Anchor to the mouse position, so that it zooms towards the mouse
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        # This signals the widget, that there is no moving updated allowed while this is loading
         self.moved = False
+        # Calculate the scaling factor according to if the user zoomed in or out
         scale_factor = 1.0 / 1.1 if event.angleDelta().y() > 0 else 1.1
         inv_scale_factor = 1.0 / scale_factor
-
-        old_downsample = self.cur_downsample
+        # Scaling the global zoom
         new_downsample = self.cur_downsample * scale_factor
 
-        if new_downsample == old_downsample or new_downsample > self.max_downsample or new_downsample < 0.3:
+        # Checks if the lower or upper bound was reached
+        if new_downsample > self.max_downsample or new_downsample < 0.3:
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
             return
 
+        # Scales the Viewport
         self.scale(inv_scale_factor, inv_scale_factor)
-
+        # Set the current global zoom
         self.cur_downsample = new_downsample
 
-        self.level_change_check(new_downsample)
+        # Checks if the level needs to be changed
+        self.level_change_check()
 
+        # Set the anchor back to no anchor and update pixmap
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.update_pixmap()
 
-    def level_change_check(self, downsample):
-        if self.cur_level != self.slide.get_best_level_for_downsample(downsample) and self.zoom_finished:
+    def level_change_check(self):
+        """
+        This checks if the level changed and prepares the Widget for a level change if the level changed.
+        :return: /
+        """
+        # Checks if the level has changed and if the current zoom is finished
+        if self.cur_level != self.slide.get_best_level_for_downsample(self.cur_downsample) and self.zoom_finished:
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
             self.zoomed = True
-            level_diff = self.cur_level - self.slide.get_best_level_for_downsample(downsample)
-            if self.cur_level > self.slide.get_best_level_for_downsample(downsample):
+            # Get the current level difference
+            level_diff = self.cur_level - self.slide.get_best_level_for_downsample(self.cur_downsample)
+
+            # This if statement checks, whether the user is zooming in our out.
+            if self.cur_level > self.slide.get_best_level_for_downsample(self.cur_downsample):
+                # When zooming in, we need to check for the level difference, since we could zoom over multiple
+                # levels at once. The current offset from the old anchor point to the new one is the distance on the
+                # current level, time 2 to the power of the level difference.
+                # TODO: This assumes that the downsample for each level is 2.
+                #  This should be changed to an arbitrary downsample.
                 self.zoomed_factor = 2 ** level_diff
                 back_scale = (0.5 * self.zoomed_factor) / self.viewportTransform().m11()
             else:
+                # The same principal applies here, only that the distance is halved for each level difference.
                 self.zoomed_factor = 0.5 ** (-level_diff)
                 back_scale = self.zoomed_factor / self.viewportTransform().m11()
 
+            # Zooming to the threshold
             self.scale(back_scale, back_scale)
+            # Calculating the vector from the old anchor point to the current top left corner of the viewport
             self.zoom_offset = QPoint(
                 -(int(self.viewportTransform().m31() / self.viewportTransform().m11()) + self.width),
                 -(int(self.viewportTransform().m32() / self.viewportTransform().m11()) + self.height))
+            # Setting the new anchorpoint (on slide level 0)
             self.anchor_point = self.anchor_point + self.zoom_offset * self.level_downsamples[self.cur_level]
+            # Zooming back to the current zoom
             self.scale(1 / back_scale, 1 / back_scale)
-            self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
 
+            # Calculating the current level
+            self.cur_level = self.slide.get_best_level_for_downsample(self.cur_downsample)
+            # Preparing the widget for the calculation of the new Pixmap
             self.zoom_finished = False
             self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-            self.update_pixmap()
+
+    @Slot(QPixmap)
+    def set_pixmap(self, result: QPixmap):
+        """
+        This method sets the newly generated pixmap as the current pixmap.
+        :param result: Newly generated pixmap
+        :return: /
+        """
+        self.pixmap = result
+        # Sends the new pixmap to the display widget
+        self.sendPixmap.emit(self.pixmap)
+
+        # Setting the current anchor to no anchor
+        old_anchor_mode = self.transformationAnchor()
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+
+        # Checks if the current pixmap is a zoomed pixmap
+        if not self.zoom_finished:
+            self.zoom_adjustment()
+
+        # Applies the translation if the pixmap was moved
+        self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
+
+        self.setTransformationAnchor(old_anchor_mode)
+        self.pixmap_compensation = QPointF(0, 0)
+        self.updating = False
+        if not self.zoom_finished:
+            self.zoom_finished = True
+        self.moved = False
+
+        # Check if the level has to be changed
+        self.level_change_check()
+        # Check if the pixmap needs to be updated
+        self.update_pixmap()
+
+    def zoom_adjustment(self):
+        """
+        This method calculates the adjustment that needs to be applied, if the new pixmap is a zoomed pixmap.
+        This means, that the method needs to be executed, when the level changed to synchronise between levels.
+        :return: /
+        """
+        # Ensure that the anchor is not set
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+
+        # Calculate the current offset to the top left corner of the pixmap
+        current_width = self.viewportTransform().m31() / self.viewportTransform().m11()
+        current_height = self.viewportTransform().m32() / self.viewportTransform().m22()
+
+        # This calculates the current local scale for the level of the newly generated slide
+        scale = self.level_downsamples[self.cur_level] / self.cur_downsample
+
+        # The following code sets the new transformation,
+        # so that the pixmap can be synchronized with the previous pixmap
+        self.resetTransform()
+        self.horizontalScrollBar().setValue(0)
+        self.verticalScrollBar().setValue(0)
+
+        # The new width and height are calculated based on the current width/height, the previously calculated offset
+        # and how many levels where zoomed.
+        new_width = (-self.width + (current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale
+        new_height = (-self.height + (current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale
+        self.setTransform(QTransform(scale, 0, 0,
+                                     0, scale, 0,
+                                     new_width, new_height, 1.0))
 
     @Slot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent):
@@ -384,20 +478,6 @@ class SlideView(QGraphicsView):
                 self.moved = True
         super().mouseMoveEvent(event)
 
-    def get_cur_zoomed_patch_width(self):
-        """
-        Utility method to calculate the current width of a patch relative to the zoom
-        :return: zoomed patch width
-        """
-        return self.width / self.cur_level_zoom
-
-    def get_cur_zoomed_patch_height(self):
-        """
-        Utility method to calculate the current height of a patch relative to the zoom
-        :return: zoomed patch height
-        """
-        return self.height / self.cur_level_zoom
-
     def get_cur_patch_width_slide(self):
         """
         Utility method to calculate the current width of a patch given by the current level
@@ -412,114 +492,121 @@ class SlideView(QGraphicsView):
         """
         return int(self.height * self.level_downsamples[self.cur_level])
 
-    def get_mouse_vp(self, event):
+    def get_top_left_coords(self):
         """
-        This method calculates the mouse position in the viewport relative to the position of the QPixmapItem during an
-        event
-        :return: mouse pos in viewport during event
+        This Method returns the top left corner of the viewport in slide coordinates
+        :return: Top left corner of viewport in slide coordinates
         """
-        top_left = - self.pixmap_item.pos()
-        mouse_pos = event.position()
-        return (top_left + mouse_pos) * self.cur_level_zoom
-
-    @Slot(QPixmap)
-    def set_pixmap(self, result):
-        self.pixmap = result
-        self.sendPixmap.emit(self.pixmap)
-        old_anchor_mode = self.transformationAnchor()
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        if not self.zoom_finished:
-            self.zoom_adjustment()
-        self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
-        self.setTransformationAnchor(old_anchor_mode)
-        self.pixmap_compensation = QPointF(0, 0)
-        self.updating = False
-        if not self.zoom_finished:
-            self.zoom_finished = True
-        self.moved = False
-        self.update_pixmap()
-
-    def zoom_adjustment(self):
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        current_width = self.viewportTransform().m31() / self.viewportTransform().m11()
-        current_height = self.viewportTransform().m32() / self.viewportTransform().m22()
-        scale = self.level_downsamples[self.cur_level] / self.cur_downsample
-        self.resetTransform()
-        self.horizontalScrollBar().setValue(0)
-        self.verticalScrollBar().setValue(0)
-        self.setTransform(QTransform(scale, 0, 0,
-                                     0, scale, 0,
-                                     (-self.width + (
-                                             current_width + self.width + self.zoom_offset.x()) * self.zoomed_factor) * scale,
-                                     (-self.height + (
-                                             current_height + self.height + self.zoom_offset.y()) * self.zoomed_factor) * scale,
-                                     1.0))
-
-    def fitInView(self, rect: QRectF, mode: Qt.AspectRatioMode = Qt.AspectRatioMode.IgnoreAspectRatio) -> None:
-        if not rect.isNull():
-            self.setSceneRect(rect)
-            unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
-            self.scale(1 / unity.width(), 1 / unity.height())
-            view_rect = self.viewport().rect()
-            scene_rect = self.transform().mapRect(rect)
-            factor = min(view_rect.width() / scene_rect.width(),
-                         view_rect.height() / scene_rect.height())
-            self.scale(factor, factor)
+        offset_to_anchor = QPoint(-int(self.viewportTransform().m31() / self.viewportTransform().m11() + self.width),
+                                  -int(self.viewportTransform().m32() / self.viewportTransform().m22() + self.height))
+        return self.anchor_point + offset_to_anchor
 
 
 class ImageBlockWrapper(QThread):
+    """
+    This is a thread class, that calculates the next Pixmap.
+    """
     finished = Signal(QPixmap)
 
-    def __init__(self, parent, offset_anchor_point, block_width, block_height, block_width_slide, block_height_slide,
-                 sqrt_threads, generate_new, max_threads, slide, cur_level, image_patches, fused_image):
-        super().__init__(parent)
+    def __init__(self, offset_anchor_point: QPoint, block_width: int, block_height: int, block_width_slide: int,
+                 block_height_slide: int, sqrt_threads: int, generate_new: list[bool], max_threads: int,
+                 slide: OpenSlide, cur_level: int, image_patches: dict, fused_image: Image.Image):
+        super().__init__()
+        # This is the anchorpoint but offset to the top left of the pixmap in slide coordinates
         self.offset_anchor_point = offset_anchor_point
+        # This is the width of one block (patch) in viewport size
         self.block_width = block_width
+        # This is the height of one block in viewport size
         self.block_height = block_height
+        # This is the width of one block in slide size
         self.block_width_slide = block_width_slide
+        # This is the height of one block in slide size
         self.block_height_slide = block_height_slide
+        # This is the number of threads used per row or column
         self.sqrt_threads = sqrt_threads
+        # This is a list of booleans, that determines which blocks need to be reloaded
         self.generate_new = generate_new
+        # This is the number of threads used overall
         self.max_threads = max_threads
+        # This is the slide that is extracted from
         self.slide = slide
+        # This is the current level
         self.cur_level = cur_level
+        # This is the storage for the current image patches
         self.image_patches = image_patches
+        # This is the storage of the resulting image
         self.fused_image = fused_image
 
     def run(self):
-        thread_list = [ImageBlockWorker(i, self.offset_anchor_point, self.block_width,
-                                        self.block_height, self.block_width_slide, self.block_height_slide,
-                                        self.sqrt_threads, self.generate_new[i], self.slide, self.cur_level,
-                                        self.image_patches, self.fused_image) for i in
+        """
+        Generated the new Pixmap
+        :return: /
+        """
+        # Initialize all threads
+        thread_list = [ImageBlockWorker(block_index=i,
+                                        offset_anchor_point=self.offset_anchor_point,
+                                        block_width=self.block_width,
+                                        block_height=self.block_height,
+                                        block_width_slide=self.block_width_slide,
+                                        block_height_slide=self.block_height_slide,
+                                        sqrt_threads=self.sqrt_threads,
+                                        generate_new=self.generate_new[i],
+                                        slide=self.slide,
+                                        cur_level=self.cur_level,
+                                        image_patches=self.image_patches,
+                                        fused_image=self.fused_image) for i in
                        range(self.max_threads)]
+        # Start all threads
         [thread.start() for thread in thread_list]
+        # Wait for all threads
         [thread.wait() for thread in thread_list]
 
+        # Generate a pixmap from the resulting image
         pixmap = QPixmap.fromImage(ImageQt(self.fused_image))
+        # Send the pixmap to the main thread
         self.finished.emit(pixmap)
 
 
 class ImageBlockWorker(QThread):
+    """
+    This is a helper thread class, the generated blocks (patches) of the to be generated image.
+    """
     finished = Signal(QPainter)
 
-    def __init__(self, block_index, offset_anchor_point, block_width, block_height,
-                 block_width_slide, block_height_slide, sqrt_threads, generate_new, slide, cur_level, image_patches,
-                 fused_image):
+    def __init__(self, block_index: int, offset_anchor_point: QPointF, block_width: int, block_height: int,
+                 block_width_slide: int, block_height_slide: int, sqrt_threads: int, generate_new: bool,
+                 slide: OpenSlide, cur_level: int, image_patches: dict, fused_image: Image.Image):
         super().__init__()
+        # The index of the current block
         self.block_index = block_index
+        # Offset anchor point
         self.offset_anchor_point = offset_anchor_point
+        # Block width in viewport size
         self.block_width = block_width
+        # Block height in viewport size
         self.block_height = block_height
+        # Block width in slide size
         self.block_width_slide = block_width_slide
+        # Block height in slide size
         self.block_height_slide = block_height_slide
+        # Number of threads per row or column
         self.sqrt_threads = sqrt_threads
+        # Boolean to check if this patch needs to be generated new
         self.generate_new = generate_new
+        # Slide from which the block is extracted
         self.slide = slide
+        # The current level
         self.cur_level = cur_level
+        # Storage for the blocks
         self.image_patches = image_patches
+        # Resulting image storage
         self.fused_image = fused_image
 
     def run(self):
+        """
+        Runs the method that generated the new patch.
+        :return: /
+        """
         self.process_image_block(self.block_index, self.offset_anchor_point, self.block_width,
                                  self.block_height, self.block_width_slide, self.block_height_slide,
                                  self.sqrt_threads, self.generate_new)
@@ -540,22 +627,28 @@ class ImageBlockWorker(QThread):
         :param generate_new: This is a boolean that checks if the current patch should be newly generated
         :return: /
         """
+        # Calculate the indices of the current block
         idx_width = block_index % sqrt_threads
         idx_height = block_index // sqrt_threads
 
+        # Calculate the current blocks upper left corner local coordinates on level 0
         block_location = (
             idx_width * block_width_slide,
             idx_height * block_height_slide
         )
 
+        # Check if the block needs to be generated
         if generate_new:
+            # Read the block from the slide object
             image = self.slide.read_region(
                 (int(offset_anchor_point.x() + block_location[0]), int(offset_anchor_point.y() + block_location[1])),
                 self.cur_level,
                 (block_width, block_height)
             )
 
+            # Store the new block
             self.image_patches[idx_width, idx_height] = image
 
+        # Paste the new block into the image
         self.fused_image.paste(self.image_patches[idx_width, idx_height],
                                (idx_width * block_width, idx_height * block_height))
