@@ -251,7 +251,7 @@ class SlideView(QGraphicsView):
         return new_patches
 
     @staticmethod
-    def efficient_roll(arr: np._typing.NDArray, direction: int, axis: int) -> np._typing.NDArray | Exception:
+    def efficient_roll(arr, direction: int, axis: int):
         """
         This is a function that mimics the behavior of the numpy roll function,
         since the original numpy roll function is inefficient.
