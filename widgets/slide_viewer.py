@@ -134,6 +134,7 @@ class SlideView(QGraphicsView):
         self.zoomed = True
         self.update_pixmap()
 
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         # Set the correct scale and offset for the displayed image
         self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
