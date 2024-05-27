@@ -94,6 +94,7 @@ class SlideView(QGraphicsView):
             self.sendPixmap.emit(self.pixmap)
             return
 
+        print(f"Start: {self.viewportTransform()}")
         # Setting slide and filepath
         self.slide = OpenSlide(filepath)
         self.filepath = filepath
@@ -134,10 +135,11 @@ class SlideView(QGraphicsView):
         self.zoomed = True
         self.update_pixmap()
 
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         # Set the correct scale and offset for the displayed image
+        self.translate(-self.viewportTransform().m31(), -self.viewportTransform().m32())
         self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
+
 
     def update_pixmap(self):
         """
@@ -394,6 +396,7 @@ class SlideView(QGraphicsView):
 
         # Applies the translation if the pixmap was moved
         self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
+        print(self.viewportTransform())
 
         self.setTransformationAnchor(old_anchor_mode)
         self.pixmap_compensation = QPointF(0, 0)
