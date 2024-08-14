@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import numpy as np
@@ -5,8 +6,10 @@ import numpy as np
 from PIL import Image
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPointF, Signal, QPoint, QRectF, Slot, QThread, QTimer
-from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QTransform
-from PySide6.QtWidgets import QGraphicsView, QGraphicsPixmapItem
+from PySide6.QtGui import QPainter, Qt, QPixmap, QResizeEvent, QWheelEvent, QMouseEvent, QTransform, QPen, QColor, \
+    QBrush
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPixmapItem, QGraphicsRectItem
+from taplt.ui.annotation_group import AnnotationGroup
 
 if sys.platform.startswith("win"):
     openslide_path = os.path.abspath("./openslide/bin")
@@ -40,6 +43,8 @@ class SlideView(QGraphicsView):
         self.moved = False  # Image has been moved
         self.zoomed = True  # Image has been zoomed
         self.zoom_finished = True  # Zoom operation is finished
+        self.annotations = None  # AnnotationGroup
+        self.rect = None
 
         # Slide and Filepath
         self.slide = None  # OpenSlide object
@@ -139,6 +144,15 @@ class SlideView(QGraphicsView):
         self.translate(-self.viewportTransform().m31(), -self.viewportTransform().m32())
         self.scale(1 / self.cur_level_zoom, 1 / self.cur_level_zoom)
         self.translate(-self.width, -self.height)
+
+    def setAnnotations(self, annotations: AnnotationGroup):
+        """
+        This method sets the annotations for the slide view.
+        :param annotations: The annotations for the slide view
+        :type annotations: AnnotationGroup
+        :return: /
+        """
+        self.annotations = annotations
 
 
     def update_pixmap(self):
@@ -396,7 +410,13 @@ class SlideView(QGraphicsView):
 
         # Applies the translation if the pixmap was moved
         self.translate(self.pixmap_compensation.x(), self.pixmap_compensation.y())
-        print(self.viewportTransform())
+
+        if self.annotations:
+            for shape in self.annotations.annotations.values():
+                shape.vertices.translate(-self.pixmap_compensation)
+                if self.rect:
+                    self.rect.moveBy(-self.pixmap_compensation.x(),
+                                     -self.pixmap_compensation.y())
 
         self.setTransformationAnchor(old_anchor_mode)
         self.pixmap_compensation = QPointF(0, 0)
@@ -418,6 +438,20 @@ class SlideView(QGraphicsView):
         """
         # Ensure that the anchor is not set
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        old_transform = self.viewportTransform()
+        old_scale_x = old_transform.m11()
+        old_scale_y = old_transform.m22()
+        old_translate_x = old_transform.m31()
+        old_translate_y = old_transform.m32()
+
+        old_top_left = QPointF(old_translate_x / old_scale_x, old_translate_y / old_scale_y)
+        old_distances = []
+
+        if self.annotations:
+            for shape in self.annotations.annotations.values():
+                center = shape.boundingRect().center()
+                cur_distance = center + old_top_left
+                old_distances.append(cur_distance)
 
         # Calculate the current offset to the top left corner of the pixmap
         current_width = self.viewportTransform().m31() / self.viewportTransform().m11()
@@ -439,6 +473,21 @@ class SlideView(QGraphicsView):
         self.setTransform(QTransform(scale, 0, 0,
                                      0, scale, 0,
                                      new_width, new_height, 1.0))
+
+        new_top_left = QPointF(self.viewportTransform().m31() / self.viewportTransform().m11(),
+                               self.viewportTransform().m32() / self.viewportTransform().m22())
+
+        if self.annotations:
+            for i, shape in enumerate(self.annotations.annotations.values()):
+                center = shape.boundingRect().center()
+
+                shape.rescale(self.zoomed_factor)
+
+                cur_distance = center + new_top_left
+                shape.vertices.translate(-cur_distance)
+
+                shape.vertices.translate(old_distances[i] * self.zoomed_factor)
+
 
     @Slot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent):
