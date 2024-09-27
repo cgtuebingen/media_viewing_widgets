@@ -45,6 +45,7 @@ class SlideView(QGraphicsView):
         self.zoom_finished = True  # Zoom operation is finished
         self.annotations = None  # AnnotationGroup
         self.rect = None
+        self.allow_resize = True
 
         # Slide and Filepath
         self.slide = None  # OpenSlide object
@@ -99,7 +100,6 @@ class SlideView(QGraphicsView):
             self.sendPixmap.emit(self.pixmap)
             return
 
-        print(f"Start: {self.viewportTransform()}")
         # Setting slide and filepath
         self.slide = OpenSlide(filepath)
         self.filepath = filepath
@@ -307,7 +307,7 @@ class SlideView(QGraphicsView):
         :param event: event to initialize the function
         :return: /
         """
-        if self.slide:
+        if self.slide and self.allow_resize:
             self.zoomed = True
             self.update_pixmap()
 
