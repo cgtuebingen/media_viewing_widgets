@@ -93,13 +93,7 @@ class SlideView(QGraphicsView):
         :type height: int
         :return: /
         """
-        # TODO: Temporary solution for saving the zoom and movement of the current wsi slide.
-        #  This will not save the zoom if the user switches to any other whole slide image.
-        if self.filepath and self.filepath == filepath:
-            self.update_pixmap()
-            self.sendPixmap.emit(self.pixmap)
-            return
-
+        self.resetTransform()
         # Setting slide and filepath
         self.slide = OpenSlide(filepath)
         self.filepath = filepath
