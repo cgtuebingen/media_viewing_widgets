@@ -15,6 +15,7 @@ class ImageViewer(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setMouseTracking(True)
+        self.image_size = QSize(0, 0)
 
         # Protected Item
         self._scaling_factor = 5 / 4
@@ -24,7 +25,8 @@ class ImageViewer(QGraphicsView):
         if not rect.isNull():
             self.setSceneRect(rect)
             if not self.b_isEmpty:
-                unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                # unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                unity = QRectF(0,0,1,1)
                 self.scale(1 / unity.width(), 1 / unity.height())
                 view_rect = self.viewport().rect()
                 scene_rect = self.transform().mapRect(rect)
@@ -33,7 +35,8 @@ class ImageViewer(QGraphicsView):
                 self.scale(factor, factor)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
-        bounds = self.scene().itemsBoundingRect()
+        #bounds = self.scene().itemsBoundingRect()
+        bounds = QRectF(0, 0, self.image_size.width(), self.image_size.height())
         self.fitInView(bounds, Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event):

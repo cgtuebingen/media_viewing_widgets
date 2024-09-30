@@ -358,7 +358,7 @@ class SlideView(QGraphicsView):
                 # levels at once. The current offset from the old anchor point to the new one is the distance on the
                 # current level, time 2 to the power of the level difference.
                 # TODO: This assumes that the downsample for each level is 2.
-                #  This should be changed to an arbitrary downsample.
+                #  This should be changed to the downsample that the slide actually has.
                 self.zoomed_factor = 2 ** level_diff
                 back_scale = (0.5 * self.zoomed_factor) / self.viewportTransform().m11()
             else:
@@ -539,14 +539,12 @@ class SlideView(QGraphicsView):
         """
         return int(self.height * self.level_downsamples[self.cur_level])
 
-    def get_top_left_coords(self):
-        """
-        This Method returns the top left corner of the viewport in slide coordinates
-        :return: Top left corner of viewport in slide coordinates
-        """
-        offset_to_anchor = QPoint(-int(self.viewportTransform().m31() / self.viewportTransform().m11() + self.width),
-                                  -int(self.viewportTransform().m32() / self.viewportTransform().m22() + self.height))
-        return self.anchor_point + offset_to_anchor
+    # def get_anchorpoint(self):
+    #     """
+    #     This Method returns the top left corner of the viewport in slide coordinates
+    #     :return: Top left corner of viewport in slide coordinates
+    #     """
+    #     return self.anchor_point
 
 
 class ImageBlockWrapper(QThread):
